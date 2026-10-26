@@ -8,7 +8,7 @@ describe('buildListUrl', () => {
     expect(url.origin + url.pathname).toBe('https://www.tibia.com/charactertrade/');
     expect(url.searchParams.get('subtopic')).toBe('currentcharactertrades');
     expect(url.searchParams.get('order_column')).toBe('101');
-    expect(url.searchParams.get('order_direction')).toBe('1');
+    expect(url.searchParams.get('order_direction')).toBe('0');
     expect(url.searchParams.get('currentpage')).toBe('1');
   });
 

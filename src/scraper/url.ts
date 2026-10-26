@@ -38,8 +38,10 @@ export function buildListUrl(filter: ListFilter = {}, page = 1): string {
   const params = url.searchParams;
 
   params.set('subtopic', 'currentcharactertrades');
-  params.set('order_column', '101');
-  params.set('order_direction', '1');
+  params.set('order_column', '101'); // Start Date
+  // direction=0 = mais novos na página 1 (verificado ao vivo: dir=0 traz os maiores
+  // auctionids; dir=1 deixa os chars recém-listados fora da página 1). Crítico p/ §5.
+  params.set('order_direction', '0');
   params.set('currentpage', String(page));
 
   for (const [key, param] of Object.entries(PARAM)) {
