@@ -36,7 +36,7 @@ Estas regras são inegociáveis neste repositório. Valem para toda tarefa de c�
 
 ## Estado atual
 
-**v1 na `main`** (PRs #1/#2). **Fase 2 (detalhe do leilão) e renovação de `cf_clearance` na branch `feat/scraper-detalhe-cf-clearance` → PR #3** (TDD, DoD verde: backend 79 unit + integração 10/10 arquivos; frontend 51 testes; lint/typecheck/build nos dois; verificação visual do Detalhe em desktop e 360px).
+**v1 na `main`** (PRs #1/#2). **Fase 2 (detalhe do leilão) + renovação de `cf_clearance` na `main`** (PR #3 mergeado). **Varredura de fim na branch `feat/end-sweep`** (TDD, DoD verde: backend 79 unit + 32 integração; lint/typecheck/build).
 
 Implementado:
 - **Fluxo A** (alerta de char novo): cron → scrape fase 1 (`url`→`http-client`→`list-parser`) → detecção **por-filtro** via `auction_match` → fila pg-boss → e-mail via Resend.
@@ -45,10 +45,11 @@ Implementado:
 - **Fluxo B** (lembretes de fim): toggle `watched_auction` agenda jobs 3d/1d/3h/1h/15m/5m (pg-boss `startAfter` + `retentionDays`); o worker, no disparo, só envia se ainda acompanhado e não terminado.
 - **CRUD de `watch_filter`** (`/filters`) e **toggle** (`PUT /auctions/:id/watch`).
 - **Leitura de leilões** (`GET /auctions`, `GET /auctions/:id`, com `watched` incluído).
+- **Varredura de fim:** `finishEndedAuctions` marca `finished` todo leilão `active` com `end_at` vencido; o cron a roda a cada ciclo, antes do backfill (sem rede). `cancelled` fora do escopo v1.
 - Entrypoint `src/main.ts`: API Fastify + worker pg-boss + cron (node-cron) no mesmo processo, com shutdown gracioso.
 - **Frontend** em `web/` (Vite + React + TS, CSS puro, `react-router`): telas Leilões, Detalhe e Filtros, timers ao vivo, toggle de acompanhar. Em dev o Vite faz proxy de `/api` → `127.0.0.1:3000`; em prod a API serve o `web/dist` na mesma origem (`WEB_DIST`, `@fastify/static` com fallback SPA), sem CORS. Se `GET /auctions` responder 404, a tela de leilões usa um mock em memória (`web/src/api/mock.ts`); `VITE_MOCK_AUCTIONS=true` força o mock com o backend desligado.
 
-**Pendente:** varredura de fim que marca `finished`/`cancelled` quando o leilão some da lista (§13). Validar o renovador de `cf_clearance` contra um challenge real (hoje o HTTP puro passa, então não há como exercitar o fallback ao vivo). Demais itens de validação/hardening em §13 (incl. truncamento de listas longas no detalhe).
+**Pendente:** validar o renovador de `cf_clearance` contra um challenge real (hoje o HTTP puro passa, então não há como exercitar o fallback ao vivo). Detecção de `cancelled` (exige raspar a página de detalhe/histórico — fora do escopo v1). Demais itens de validação/hardening em §13 (incl. truncamento de listas longas no detalhe).
 
 **`docs/PLANEJAMENTO.md` é a fonte da verdade** (documento vivo SDD). Leia-o antes de qualquer decisão de arquitetura, modelagem ou escopo — e **atualize-o** quando uma decisão mudar.
 
