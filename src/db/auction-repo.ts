@@ -6,8 +6,9 @@ import type { AuctionListEntry } from '../scraper/list-parser.js';
  * `firstSeenAt`/`lastSeenAt` usam o default do schema na criação; no update, bump de `lastSeenAt`.
  */
 export async function upsertAuction(prisma: PrismaClient, entry: AuctionListEntry): Promise<void> {
-  const currentBid = entry.bid.kind === 'current' ? entry.bid.amount : null;
-  const minBid = entry.bid.kind === 'minimum' ? entry.bid.amount : null;
+  // O card mostra SÓ um lance (mínimo antes de haver lances, atual depois). Escreve apenas
+  // o que foi visto e não zera o outro — senão o preço inicial some quando aparece um lance.
+  const bid = entry.bid.kind === 'current' ? { currentBid: entry.bid.amount } : { minBid: entry.bid.amount };
 
   const fields = {
     charName: entry.characterName,
@@ -16,8 +17,7 @@ export async function upsertAuction(prisma: PrismaClient, entry: AuctionListEntr
     sex: entry.sex,
     level: entry.level,
     endAt: entry.endsAt,
-    currentBid,
-    minBid,
+    ...bid,
   };
 
   await prisma.auction.upsert({

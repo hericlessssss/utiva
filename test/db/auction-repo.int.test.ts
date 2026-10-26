@@ -33,7 +33,7 @@ describe('auction-repo (integração)', () => {
     await prisma.$disconnect();
   });
 
-  it('reupsert do mesmo id não duplica e atualiza o lance', async () => {
+  it('reupsert atualiza o lance atual e preserva o mínimo visto antes', async () => {
     await upsertAuction(prisma, entry(1, { bid: { amount: 10, kind: 'minimum' } }));
     await upsertAuction(prisma, entry(1, { bid: { amount: 99, kind: 'current' } }));
 
@@ -41,7 +41,7 @@ describe('auction-repo (integração)', () => {
 
     const row = await prisma.auction.findUniqueOrThrow({ where: { auctionId: 1 } });
     expect(row.currentBid).toBe(99);
-    expect(row.minBid).toBeNull();
+    expect(row.minBid).toBe(10); // preservado (não zerado pelo update)
   });
 
   it('hasMatch/recordMatch: marca idempotente e hasMatch reflete', async () => {
