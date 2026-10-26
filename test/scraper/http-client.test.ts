@@ -106,6 +106,13 @@ describe('fetchPage', () => {
     ).rejects.not.toBeInstanceOf(CloudflareBlockedError);
   });
 
+  it('faz retry em 5xx transitório (502) e depois entrega', async () => {
+    const q = responder([status(502), ok()]);
+
+    await expect(fetchPage('http://x', opts(q.fetcher))).resolves.toBe('<html>ok</html>');
+    expect(q.calls).toBe(2);
+  });
+
   it('lança erro genérico (sem retry) para status não-retryável', async () => {
     const q = responder([status(404)]);
 

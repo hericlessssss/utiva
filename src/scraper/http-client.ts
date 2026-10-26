@@ -38,8 +38,10 @@ const CHALLENGE_MARKERS = [
   /cf_chl_opt/i,
 ];
 
-/** Status transitórios que merecem retry com backoff: 403 (challenge), 429/503 (throttle). */
-const RETRYABLE = new Set([403, 429, 503]);
+/** Status transitórios que merecem retry com backoff: 403 (challenge), 429 (throttle), 5xx. */
+function isRetryable(status: number): boolean {
+  return status === 403 || status === 429 || status >= 500;
+}
 
 function looksLikeChallenge(body: string): boolean {
   return CHALLENGE_MARKERS.some((re) => re.test(body));
@@ -97,10 +99,10 @@ export async function fetchPage(url: string, opts: FetchPageOptions = {}): Promi
       lastWasChallenge = true; // 200 mas challenge → trata como bloqueio e tenta de novo
       continue;
     }
-    if (!RETRYABLE.has(res.statusCode)) {
+    if (!isRetryable(res.statusCode)) {
       throw new Error(`GET ${url} falhou: HTTP ${res.statusCode}`);
     }
-    lastWasChallenge = res.statusCode === 403; // 429/503 = throttle, não challenge
+    lastWasChallenge = res.statusCode === 403; // 429/5xx = throttle/hiccup, não challenge
   }
 
   if (lastWasChallenge) throw new CloudflareBlockedError(url, maxRetries + 1);
