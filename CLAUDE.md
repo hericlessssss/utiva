@@ -36,17 +36,19 @@ Estas regras são inegociáveis neste repositório. Valem para toda tarefa de c�
 
 ## Estado atual
 
-**Backend e frontend de v1 implementados** na branch `feat/bootstrap-fluxo-a` (TDD, DoD verde: backend 53 testes unit + 21 de integração; frontend 49 testes; lint/typecheck/build nos dois).
+**v1 na `main`** (PRs #1/#2). **Fase 2 (detalhe do leilão) e renovação de `cf_clearance` na branch `feat/scraper-detalhe-cf-clearance` → PR #3** (TDD, DoD verde: backend 79 unit + integração 10/10 arquivos; frontend 51 testes; lint/typecheck/build nos dois; verificação visual do Detalhe em desktop e 360px).
 
 Implementado:
 - **Fluxo A** (alerta de char novo): cron → scrape fase 1 (`url`→`http-client`→`list-parser`) → detecção **por-filtro** via `auction_match` → fila pg-boss → e-mail via Resend.
+- **Fase 2 (detalhe):** `detail-parser` (ancorado por id de seção) + `runDetailBackfill` no cron detalham quem tem `attributes` nulo (skills/itens/imbuements/charms/mounts/outfits/stats → `auction.attributes` jsonb); tela de Detalhe renderiza. URL de detalhe corrigida (`page=details`, não `auctiondetails`).
+- **Renovação de `cf_clearance` (Playwright):** `cf-clearance` (`createCfSession` + `playwrightRenewer`) reusa o cookie, renova no `CloudflareBlockedError` e re-tenta (single-flight); persiste em `.cf-clearance.json`; `main` injeta `session.fetchPage` no scraper. Fallback — só age quando há challenge real.
 - **Fluxo B** (lembretes de fim): toggle `watched_auction` agenda jobs 3d/1d/3h/1h/15m/5m (pg-boss `startAfter` + `retentionDays`); o worker, no disparo, só envia se ainda acompanhado e não terminado.
 - **CRUD de `watch_filter`** (`/filters`) e **toggle** (`PUT /auctions/:id/watch`).
 - **Leitura de leilões** (`GET /auctions`, `GET /auctions/:id`, com `watched` incluído).
 - Entrypoint `src/main.ts`: API Fastify + worker pg-boss + cron (node-cron) no mesmo processo, com shutdown gracioso.
 - **Frontend** em `web/` (Vite + React + TS, CSS puro, `react-router`): telas Leilões, Detalhe e Filtros, timers ao vivo, toggle de acompanhar. Em dev o Vite faz proxy de `/api` → `127.0.0.1:3000`; em prod a API serve o `web/dist` na mesma origem (`WEB_DIST`, `@fastify/static` com fallback SPA), sem CORS. Se `GET /auctions` responder 404, a tela de leilões usa um mock em memória (`web/src/api/mock.ts`); `VITE_MOCK_AUCTIONS=true` força o mock com o backend desligado.
 
-**Pendente:** fetch do **detalhe** do leilão (fase 2, atributos/skills/itens); renovar `cf_clearance` via Playwright (fallback do `CloudflareBlockedError`). Itens de validação/hardening em §13 do planejamento.
+**Pendente:** varredura de fim que marca `finished`/`cancelled` quando o leilão some da lista (§13). Validar o renovador de `cf_clearance` contra um challenge real (hoje o HTTP puro passa, então não há como exercitar o fallback ao vivo). Demais itens de validação/hardening em §13 (incl. truncamento de listas longas no detalhe).
 
 **`docs/PLANEJAMENTO.md` é a fonte da verdade** (documento vivo SDD). Leia-o antes de qualquer decisão de arquitetura, modelagem ou escopo — e **atualize-o** quando uma decisão mudar.
 
@@ -66,7 +68,7 @@ Tudo com `pnpm`, a partir da raiz do repo:
 - `pnpm install` (uma vez) · `pnpm dev` (Vite em `:5173`, precisa da API em `:3000`) · `pnpm test` (vitest + jsdom + Testing Library) · `pnpm typecheck` · `pnpm lint` · `pnpm build`.
 - **DoD do web** = `lint` + `typecheck` + `test` + `build` verdes, mais conferir as 3 telas no browser (desktop e 360px).
 
-**Estrutura:** `src/scraper` (`url`, `http-client`, `list-parser`, `detect`, `tick`), `src/db` (`auction-repo`), `src/queue` (`new-auction-queue`, `reminder-queue`), `src/mailer`, `src/reminders` (`thresholds`, `watch`), `src/routes` (`health`, `filters`, `auctions`, `watch`), `src/{app,main,config,cron,flow,env}.ts`. Schema em `prisma/schema.prisma`. Testes de integração: sufixo `*.int.test.ts` (config `vitest.int.config.ts`). Frontend: `web/src/api` (cliente tipado, `mock`), `web/src/lib` (lógica pura: `time`, `filter-form`, `auction-list`, `options` com os códigos dos selects do tibia.com), `web/src/components` (`Switch`, `Timer`), `web/src/pages`, tokens CSS em `web/src/styles.css`. Testes ao lado do código (`*.test.ts[x]`).
+**Estrutura:** `src/scraper` (`url`, `http-client`, `list-parser`, `detail-parser`, `detect`, `tick`, `cf-clearance`), `src/db` (`auction-repo`), `src/queue` (`new-auction-queue`, `reminder-queue`), `src/mailer`, `src/reminders` (`thresholds`, `watch`), `src/routes` (`health`, `filters`, `auctions`, `watch`), `src/{app,main,config,cron,flow,env}.ts`. Schema em `prisma/schema.prisma`. Testes de integração: sufixo `*.int.test.ts` (config `vitest.int.config.ts`). Frontend: `web/src/api` (cliente tipado, `mock`), `web/src/lib` (lógica pura: `time`, `filter-form`, `auction-list`, `options` com os códigos dos selects do tibia.com), `web/src/components` (`Switch`, `Timer`), `web/src/pages`, tokens CSS em `web/src/styles.css`. Testes ao lado do código (`*.test.ts[x]`).
 
 ## O que é Utiva
 

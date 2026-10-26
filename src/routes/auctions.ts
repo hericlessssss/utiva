@@ -12,6 +12,7 @@ export async function auctionRoutes(
     prisma.auction.findMany({
       orderBy: { firstSeenAt: 'desc' },
       include: { watched: true },
+      omit: { attributes: true }, // a lista não usa o breakdown da fase 2; só o detalhe carrega
       take: 200, // leilões acumulam sem limpeza; cap os mais recentes (v1 single-user)
     }),
   );

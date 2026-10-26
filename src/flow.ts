@@ -1,6 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
 import type PgBoss from 'pg-boss';
 import { enqueueNewAuction } from './queue/new-auction-queue.js';
+import type { FetchPageFn } from './scraper/cf-clearance.js';
 import type { FetchPageOptions } from './scraper/http-client.js';
 import { runActiveFilters } from './scraper/tick.js';
 
@@ -13,10 +14,16 @@ export async function enqueueNewForActiveFilters(
   prisma: PrismaClient,
   boss: PgBoss,
   opts: FetchPageOptions = {},
+  fetchPageFn?: FetchPageFn,
 ): Promise<number> {
   // O enqueue roda dentro do detect, ANTES de marcar o match (at-least-once). O mapa
   // devolvido traz exatamente os chars novos por filtro — somamos pra ter o total.
-  const byFilter = await runActiveFilters(prisma, opts, (entry) => enqueueNewAuction(boss, entry));
+  const byFilter = await runActiveFilters(
+    prisma,
+    opts,
+    (entry) => enqueueNewAuction(boss, entry),
+    fetchPageFn,
+  );
 
   let enqueued = 0;
   for (const fresh of byFilter.values()) enqueued += fresh.length;

@@ -1,8 +1,11 @@
 import type { PrismaClient, WatchFilter } from '@prisma/client';
+import { auctionsNeedingDetail, saveAuctionDetail } from '../db/auction-repo.js';
+import type { FetchPageFn } from './cf-clearance.js';
 import { detectNewAuctions, type OnNewAuction } from './detect.js';
-import { fetchPage, type FetchPageOptions } from './http-client.js';
+import { parseAuctionDetail } from './detail-parser.js';
+import { CloudflareBlockedError, fetchPage, type FetchPageOptions } from './http-client.js';
 import type { AuctionListEntry } from './list-parser.js';
-import { buildListUrl, type ListFilter } from './url.js';
+import { buildDetailUrl, buildListUrl, type ListFilter } from './url.js';
 
 type WatchFilterParams = Pick<
   WatchFilter,
@@ -44,8 +47,9 @@ export async function runFilterTick(
   filter: WatchFilter,
   opts: FetchPageOptions = {},
   onNew?: OnNewAuction,
+  fetchPageFn: FetchPageFn = fetchPage,
 ): Promise<AuctionListEntry[]> {
-  const html = await fetchPage(buildListUrl(watchFilterToListFilter(filter)), opts);
+  const html = await fetchPageFn(buildListUrl(watchFilterToListFilter(filter)), opts);
   return detectNewAuctions(prisma, html, filter.id, onNew);
 }
 
@@ -54,6 +58,7 @@ export async function runActiveFilters(
   prisma: PrismaClient,
   opts: FetchPageOptions = {},
   onNew?: OnNewAuction,
+  fetchPageFn: FetchPageFn = fetchPage,
 ): Promise<Map<number, AuctionListEntry[]>> {
   const filters = await prisma.watchFilter.findMany({
     where: { active: true },
@@ -63,7 +68,7 @@ export async function runActiveFilters(
   const byFilter = new Map<number, AuctionListEntry[]>();
   for (const filter of filters) {
     try {
-      byFilter.set(filter.id, await runFilterTick(prisma, filter, opts, onNew));
+      byFilter.set(filter.id, await runFilterTick(prisma, filter, opts, onNew, fetchPageFn));
     } catch (err) {
       // Um filtro que falha (403/rede) não pode impedir os outros no mesmo ciclo.
       console.error(`[tick] filtro ${filter.id} falhou:`, err);
@@ -72,4 +77,41 @@ export async function runActiveFilters(
   }
 
   return byFilter;
+}
+
+const realSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Fase 2 do scraper (§5): busca e persiste o detalhe dos leilões que ainda não o têm
+ * (`attributes` nulo), um por vez (baixa concorrência) e com `delayMs` entre requests —
+ * o CLAUDE.md exige delays entre chamadas ao tibia.com pra não provocar 403/challenge.
+ * Um detalhe que falha (parse, rede) é logado e pulado — fica nulo e é re-tentado no
+ * próximo ciclo. Um bloqueio persistente do Cloudflare encerra o backfill do ciclo (o
+ * cookie precisa renovar; não adianta insistir no resto). Devolve quantos foram salvos.
+ */
+export async function runDetailBackfill(
+  prisma: PrismaClient,
+  opts: FetchPageOptions = {},
+  limit = 10,
+  delayMs = 1500,
+  sleep: (ms: number) => Promise<void> = realSleep,
+  fetchPageFn: FetchPageFn = fetchPage,
+): Promise<number> {
+  const ids = await auctionsNeedingDetail(prisma, limit);
+  let saved = 0;
+
+  for (let i = 0; i < ids.length; i++) {
+    if (i > 0 && delayMs > 0) await sleep(delayMs);
+    const id = ids[i]!;
+    try {
+      const detail = parseAuctionDetail(await fetchPageFn(buildDetailUrl(id), opts));
+      await saveAuctionDetail(prisma, id, detail);
+      saved++;
+    } catch (err) {
+      console.error(`[detail] leilão ${id} falhou:`, err);
+      if (err instanceof CloudflareBlockedError) break;
+    }
+  }
+
+  return saved;
 }

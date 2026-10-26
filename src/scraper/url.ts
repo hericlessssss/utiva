@@ -1,8 +1,17 @@
 const LIST_URL = 'https://www.tibia.com/charactertrade/';
 
-/** URL da página de detalhe de um leilão (concatenar o auctionid). */
+/**
+ * URL da página de detalhe de um leilão (concatenar o auctionid). O site usa
+ * `subtopic=currentcharactertrades&page=details&source=overview` — NÃO `subtopic=auctiondetails`
+ * (este último só reexibe a lista). Confirmado nos links `.AuctionLinks` da própria lista.
+ */
 export const AUCTION_DETAIL_URL =
-  'https://www.tibia.com/charactertrade/?subtopic=auctiondetails&auctionid=';
+  'https://www.tibia.com/charactertrade/?subtopic=currentcharactertrades&page=details&source=overview&auctionid=';
+
+/** URL da página de detalhe de um leilão (fase 2, §5). */
+export function buildDetailUrl(auctionId: number): string {
+  return `${AUCTION_DETAIL_URL}${auctionId}`;
+}
 
 /** Filtros do Char Bazaar (§5) — mapeiam 1:1 os parâmetros GET do site. */
 export interface ListFilter {
