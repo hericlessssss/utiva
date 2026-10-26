@@ -9,7 +9,11 @@ export async function auctionRoutes(
   const { prisma } = opts;
 
   app.get('/auctions', () =>
-    prisma.auction.findMany({ orderBy: { firstSeenAt: 'desc' }, include: { watched: true } }),
+    prisma.auction.findMany({
+      orderBy: { firstSeenAt: 'desc' },
+      include: { watched: true },
+      take: 200, // leilões acumulam sem limpeza; cap os mais recentes (v1 single-user)
+    }),
   );
 
   app.get<{ Params: { id: string } }>('/auctions/:id', async (req, reply) => {
