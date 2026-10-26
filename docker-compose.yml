@@ -19,6 +19,8 @@ services:
   app:
     build: .
     restart: unless-stopped
+    # Aplica as migrations do Prisma antes de subir (volume limpo não tem as tabelas).
+    command: sh -c "node_modules/.bin/prisma migrate deploy && node dist/main.js"
     depends_on:
       db:
         condition: service_healthy
