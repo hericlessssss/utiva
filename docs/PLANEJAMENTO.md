@@ -105,7 +105,7 @@ Fila/agendamento via **pg-boss** (tabelas próprias no mesmo Postgres).
 cron (node-cron) → p/ cada `watch_filter` ativo → scraper fase 1+2 → IDs novos → upsert `auction` + `auction_match` → enfileirar e-mail "char novo" (pg-boss) → worker envia via Resend.
 
 **B. Lembretes de fim**
-Ao marcar `watched_auction`, calcular os thresholds a partir de `end_at` e agendar jobs pg-boss (3d/1d/3h/1h/15m/5m). Cada job checa se o leilão ainda está ativo e envia o e-mail. Toggle off cancela os jobs pendentes.
+Ao marcar `watched_auction`, calcular os thresholds a partir de `end_at` e agendar jobs pg-boss (3d/1d/3h/1h/15m/5m) via `startAfter`, com `singletonKey` por (leilão, threshold) pra não duplicar. Cada job, ao disparar, checa se o leilão ainda está **acompanhado (`enabled`) e ativo** e só então envia — se o toggle foi desligado, o job pula. Isso substitui "cancelar os jobs pendentes" (mesmo efeito, sem rastrear/cancelar jobs no pg-boss).
 
 ---
 
@@ -159,5 +159,5 @@ Ao marcar `watched_auction`, calcular os thresholds a partir de `end_at` e agend
 - **Cloudflare aperta** → fallback FlareSolverr/ScraperAPI já previsto.
 - **Resolvido (smoke ao vivo):** usar **`order_direction=0`** — é o que traz os chars mais novos na página 1 (dir=1 deixava-os de fora, quebrando a detecção). HTTP puro passou o Cloudflare sem `cf_clearance`.
 - **Validar:** janela diária de `Auction Start`; expiração real do `cf_clearance`; cobertura de todos os campos do detalhe; limites de rate aceitáveis.
-- **Hardening adiado (YAGNI p/ v1 local/single-user):** lote nas escritas do tick (hoje ~2 queries/leilão, irrelevante no Postgres local); `min_bid`/`current_bid` são `int4` (estouraria acima de ~2,1 bi TC — valor irreal hoje) → migrar p/ `bigint` se necessário.
+- **Hardening adiado (YAGNI p/ v1 local/single-user):** lote nas escritas do tick (hoje ~2 queries/leilão, irrelevante no Postgres local); `min_bid`/`current_bid` são `int4` (estouraria acima de ~2,1 bi TC — valor irreal hoje) → migrar p/ `bigint` se necessário; **`auction.status` nunca transiciona** (fica sempre `active`) — falta uma varredura que marque `finished`/`cancelled` quando o leilão some da lista. Os lembretes já se protegem por `end_at` (não dependem de `status`).
 - **Decidir depois:** domínio + handle GitHub; identidade visual.
