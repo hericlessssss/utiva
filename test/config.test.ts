@@ -14,7 +14,7 @@ describe('loadConfig', () => {
 
     expect(cfg.databaseUrl).toBe(base.DATABASE_URL);
     expect(cfg.resend).toEqual({ apiKey: 're_123', from: 'bot@utiva.gg', to: 'me@x.com' });
-    expect(cfg.host).toBe('0.0.0.0');
+    expect(cfg.host).toBe('127.0.0.1');
     expect(cfg.port).toBe(3000);
     expect(cfg.scrapeCron).toBe('*/5 * * * *');
     expect(cfg.cfClearance).toBeUndefined();

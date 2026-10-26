@@ -21,7 +21,8 @@ function required(env: Env, key: string): string {
 export function loadConfig(env: Env): AppConfig {
   return {
     port: resolvePort(env.PORT),
-    host: env.HOST?.trim() || '0.0.0.0',
+    // Default local-only (v1 single-user); no Docker o compose passa HOST=0.0.0.0.
+    host: env.HOST?.trim() || '127.0.0.1',
     databaseUrl: required(env, 'DATABASE_URL'),
     resend: {
       apiKey: required(env, 'RESEND_API_KEY'),
