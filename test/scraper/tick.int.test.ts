@@ -1,0 +1,44 @@
+import { readFileSync } from 'node:fs';
+import { PrismaClient } from '@prisma/client';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import type { Fetcher } from '../../src/scraper/http-client.js';
+import { runActiveFilters, runFilterTick } from '../../src/scraper/tick.js';
+
+const fixture = readFileSync(new URL('../fixtures/list-page-1.html', import.meta.url), 'utf8');
+const prisma = new PrismaClient();
+const fixtureFetcher: Fetcher = () => Promise.resolve({ statusCode: 200, body: fixture });
+
+describe('runFilterTick / runActiveFilters (integração)', () => {
+  beforeEach(async () => {
+    await prisma.auctionMatch.deleteMany();
+    await prisma.auction.deleteMany();
+    await prisma.watchFilter.deleteMany();
+  });
+
+  afterAll(async () => {
+    await prisma.auctionMatch.deleteMany();
+    await prisma.auction.deleteMany();
+    await prisma.watchFilter.deleteMany();
+    await prisma.$disconnect();
+  });
+
+  it('runFilterTick detecta, persiste e registra os matches do filtro', async () => {
+    const filter = await prisma.watchFilter.create({ data: { world: 'Secura' } });
+
+    const fresh = await runFilterTick(prisma, filter, { fetcher: fixtureFetcher });
+
+    expect(fresh.map((e) => e.auctionId)).toEqual([2292063, 2292077, 2292089]);
+    expect(await prisma.auction.count()).toBe(3);
+    expect(await prisma.auctionMatch.count()).toBe(3);
+  });
+
+  it('runActiveFilters roda só os filtros ativos', async () => {
+    await prisma.watchFilter.create({ data: { world: 'Secura', active: true } });
+    await prisma.watchFilter.create({ data: { world: 'Antica', active: false } });
+
+    const result = await runActiveFilters(prisma, { fetcher: fixtureFetcher });
+
+    expect(result.size).toBe(1);
+    expect([...result.values()][0]!.map((e) => e.auctionId)).toEqual([2292063, 2292077, 2292089]);
+  });
+});
