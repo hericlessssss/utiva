@@ -13,6 +13,7 @@ Estas regras são inegociáveis neste repositório. Valem para toda tarefa de c�
 - **SDD (Spec-Driven Development) sempre.** `docs/PLANEJAMENTO.md` é a spec viva. Leia a seção relevante antes de decidir; se a decisão mudar, atualize o doc no mesmo trabalho.
 - **TDD (Test-Driven Development) sempre.** Escreva o teste que falha → faça passar → refatore. Nenhum código de produção sem um teste que o exija primeiro.
 - **DoD (Definition of Done) sempre.** Só considere pronto com: lint + type-check + testes verdes + cobertura do parser (quando toca parser) + fluxo A/B ponta a ponta local quando aplicável. Relate o resultado real, incluindo falhas.
+- **Verificação visual sempre.** Todo ajuste deve ser conferido **visualmente no frontend rodando em localhost** antes de concluir — testes verdes não bastam. Suba o painel (`pnpm --dir web dev`, Vite em `:5173` com proxy `/api`→`:3000`; ou a API servindo `web/dist`) e confira a mudança na tela (desktop e 360px). Use a skill `claude-in-chrome`/`playwright` para abrir e inspecionar quando fizer sentido.
 
 ### Design de código
 
