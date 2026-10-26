@@ -113,6 +113,23 @@ describe('fetchPage', () => {
     expect(q.calls).toBe(2);
   });
 
+  it('faz retry quando o fetcher lança (timeout / erro de rede)', async () => {
+    let n = 0;
+    const fetcher: Fetcher = () => {
+      n += 1;
+      return n === 1 ? Promise.reject(new Error('ECONNRESET')) : Promise.resolve(ok());
+    };
+
+    await expect(fetchPage('http://x', opts(fetcher))).resolves.toBe('<html>ok</html>');
+    expect(n).toBe(2);
+  });
+
+  it('propaga o erro de rede quando esgota os retries', async () => {
+    const fetcher: Fetcher = () => Promise.reject(new Error('timeout'));
+
+    await expect(fetchPage('http://x', opts(fetcher, { maxRetries: 1 }))).rejects.toThrow(/timeout/);
+  });
+
   it('lança erro genérico (sem retry) para status não-retryável', async () => {
     const q = responder([status(404)]);
 

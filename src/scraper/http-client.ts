@@ -85,15 +85,26 @@ export async function fetchPage(url: string, opts: FetchPageOptions = {}): Promi
   if (cfClearance) headers.cookie = `cf_clearance=${cfClearance}`;
 
   // Reflete só a ÚLTIMA tentativa: um 403 inicial não deve mascarar um 429/503 final.
+  // Reflete só a ÚLTIMA tentativa.
   let lastWasChallenge = false;
   let lastStatus = 0;
+  let lastError: unknown;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     if (attempt > 0) await sleep(backoffMs(attempt - 1));
 
-    const res = await fetcher(url, headers);
-    lastStatus = res.statusCode;
+    let res: PageResponse;
+    try {
+      res = await fetcher(url, headers);
+      lastError = undefined;
+    } catch (err) {
+      // timeout (AbortSignal) ou erro de rede (ECONNRESET/DNS) → backoff e tenta de novo
+      lastError = err;
+      lastWasChallenge = false;
+      continue;
+    }
 
+    lastStatus = res.statusCode;
     if (res.statusCode === 200) {
       if (!looksLikeChallenge(res.body)) return res.body;
       lastWasChallenge = true; // 200 mas challenge → trata como bloqueio e tenta de novo
@@ -105,6 +116,7 @@ export async function fetchPage(url: string, opts: FetchPageOptions = {}): Promi
     lastWasChallenge = res.statusCode === 403; // 429/5xx = throttle/hiccup, não challenge
   }
 
+  if (lastError) throw lastError instanceof Error ? lastError : new Error(String(lastError));
   if (lastWasChallenge) throw new CloudflareBlockedError(url, maxRetries + 1);
   throw new Error(`GET ${url} falhou após ${maxRetries + 1} tentativa(s): HTTP ${lastStatus}`);
 }
