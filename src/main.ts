@@ -5,6 +5,7 @@ import { loadConfig } from './config.js';
 import { startScraperCron } from './cron.js';
 import { enqueueNewForActiveFilters } from './flow.js';
 import { resendTransport } from './mailer/resend-transport.js';
+import { finishEndedAuctions } from './db/auction-repo.js';
 import { createCfSession, createFileCredsStore, playwrightRenewer } from './scraper/cf-clearance.js';
 import { runDetailBackfill } from './scraper/tick.js';
 import { buildListUrl } from './scraper/url.js';
@@ -55,6 +56,12 @@ async function main(): Promise<void> {
   const cronHandle = startScraperCron(cfg.scrapeCron, async () => {
     const enqueued = await enqueueNewForActiveFilters(prisma, boss, {}, session.fetchPage);
     if (enqueued > 0) app.log.info(`enfileirados ${enqueued} alerta(s) de char novo`);
+
+    // Varredura de fim (§13): marca `finished` quem já venceu (`end_at` no passado). Sem rede,
+    // só DB. (O backfill já ignora leilão vencido por conta própria; a varredura é o registro
+    // persistente do término, não uma otimização dele.)
+    const finished = await finishEndedAuctions(prisma);
+    if (finished > 0) app.log.info(`marcados ${finished} leilão(ões) como finished`);
 
     // Fase 2: enriquece com o detalhe (skills/itens/imbuements/…) os leilões sem attributes.
     const detailed = await runDetailBackfill(prisma, {}, 10, 1500, undefined, session.fetchPage);

@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { hasMatch, recordMatch, upsertAuction } from '../../src/db/auction-repo.js';
+import { finishEndedAuctions, hasMatch, recordMatch, upsertAuction } from '../../src/db/auction-repo.js';
 import type { AuctionListEntry } from '../../src/scraper/list-parser.js';
 
 const prisma = new PrismaClient();
@@ -42,6 +42,31 @@ describe('auction-repo (integração)', () => {
     const row = await prisma.auction.findUniqueOrThrow({ where: { auctionId: 1 } });
     expect(row.currentBid).toBe(99);
     expect(row.minBid).toBe(10); // preservado (não zerado pelo update)
+  });
+
+  it('finishEndedAuctions: marca active+terminado como finished e ignora o resto', async () => {
+    const past = new Date(Date.now() - 60_000);
+    const future = new Date(Date.now() + 60_000);
+    await upsertAuction(prisma, entry(10, { endsAt: past })); // ativo, terminou → finished
+    await upsertAuction(prisma, entry(11, { endsAt: future })); // ativo, rodando → intocado
+    await upsertAuction(prisma, entry(12, { endsAt: past }));
+    await prisma.auction.update({ where: { auctionId: 12 }, data: { status: 'cancelled' } }); // já resolvido → intocado
+
+    expect(await finishEndedAuctions(prisma)).toBe(1);
+
+    const row = async (id: number) => prisma.auction.findUniqueOrThrow({ where: { auctionId: id } });
+    expect((await row(10)).status).toBe('finished');
+    expect((await row(11)).status).toBe('active');
+    expect((await row(12)).status).toBe('cancelled');
+    // A varredura só mexe em `status`: o leilão marcado preserva os demais campos (ex.: bid).
+    expect((await row(10)).currentBid).toBe(50);
+  });
+
+  it('finishEndedAuctions: idempotente — nada a marcar numa segunda passada', async () => {
+    await upsertAuction(prisma, entry(13, { endsAt: new Date(Date.now() - 60_000) }));
+
+    expect(await finishEndedAuctions(prisma)).toBe(1);
+    expect(await finishEndedAuctions(prisma)).toBe(0);
   });
 
   it('hasMatch/recordMatch: marca idempotente e hasMatch reflete', async () => {

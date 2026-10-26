@@ -29,10 +29,30 @@ export async function upsertAuction(prisma: PrismaClient, entry: AuctionListEntr
 }
 
 /**
+ * Varredura de fim (§13): marca `finished` todo leilão ainda `active` cujo `endAt` já passou.
+ * Só fetchamos a página 1 da lista (ordenada por Start Date desc), então "sumiu da lista" não
+ * é observável — leilões vivos saem da página 1 só por serem empurrados pelos mais novos. O
+ * `endAt` vencido é o único sinal barato e confiável de término; é o mesmo critério que já
+ * protege os lembretes. Idempotente (o filtro `active` exclui quem já foi resolvido). Não
+ * distingue `cancelled` (exigiria raspar a página de detalhe/histórico — fora do escopo v1).
+ * Devolve quantos foram marcados.
+ */
+export async function finishEndedAuctions(
+  prisma: PrismaClient,
+  now: Date = new Date(),
+): Promise<number> {
+  const { count } = await prisma.auction.updateMany({
+    where: { status: 'active', endAt: { lte: now } },
+    data: { status: 'finished' },
+  });
+  return count;
+}
+
+/**
  * IDs de leilões ainda não detalhados (fase 2): `attributes` nulo, ativos e que ainda não
- * terminaram (`endAt` no futuro). Excluir os já encerrados evita re-tentar p/ sempre quem
- * saiu da lista mas nunca foi marcado `finished` (a varredura de fim ainda é pendente, §13) —
- * senão cada ciclo queimaria requests do tibia.com à toa. Cap por `limit` (§5).
+ * terminaram (`endAt` no futuro). O filtro `endAt` cobre a janela entre varreduras de fim
+ * (§13): um leilão que venceu mas ainda não virou `finished` não queima requests do
+ * tibia.com à toa. Cap por `limit` (§5).
  */
 export async function auctionsNeedingDetail(
   prisma: PrismaClient,
