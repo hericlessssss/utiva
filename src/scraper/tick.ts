@@ -1,5 +1,5 @@
 import type { PrismaClient, WatchFilter } from '@prisma/client';
-import { detectNewAuctions } from './detect.js';
+import { detectNewAuctions, type OnNewAuction } from './detect.js';
 import { fetchPage, type FetchPageOptions } from './http-client.js';
 import type { AuctionListEntry } from './list-parser.js';
 import { buildListUrl, type ListFilter } from './url.js';
@@ -43,15 +43,17 @@ export async function runFilterTick(
   prisma: PrismaClient,
   filter: WatchFilter,
   opts: FetchPageOptions = {},
+  onNew?: OnNewAuction,
 ): Promise<AuctionListEntry[]> {
   const html = await fetchPage(buildListUrl(watchFilterToListFilter(filter)), opts);
-  return detectNewAuctions(prisma, html, filter.id);
+  return detectNewAuctions(prisma, html, filter.id, onNew);
 }
 
 /** Roda um tick para cada watch_filter ativo, em sequência (baixa concorrência, §5). */
 export async function runActiveFilters(
   prisma: PrismaClient,
   opts: FetchPageOptions = {},
+  onNew?: OnNewAuction,
 ): Promise<Map<number, AuctionListEntry[]>> {
   const filters = await prisma.watchFilter.findMany({
     where: { active: true },
@@ -60,7 +62,7 @@ export async function runActiveFilters(
 
   const byFilter = new Map<number, AuctionListEntry[]>();
   for (const filter of filters) {
-    byFilter.set(filter.id, await runFilterTick(prisma, filter, opts));
+    byFilter.set(filter.id, await runFilterTick(prisma, filter, opts, onNew));
   }
 
   return byFilter;

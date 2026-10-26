@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { listSeenAuctionIds, recordMatch, upsertAuction } from '../../src/db/auction-repo.js';
+import { hasMatch, recordMatch, upsertAuction } from '../../src/db/auction-repo.js';
 import type { AuctionListEntry } from '../../src/scraper/list-parser.js';
 
 const prisma = new PrismaClient();
@@ -33,31 +33,27 @@ describe('auction-repo (integração)', () => {
     await prisma.$disconnect();
   });
 
-  it('listSeenAuctionIds devolve só os ids da página que já existem', async () => {
-    await upsertAuction(prisma, entry(2292063));
-
-    expect(await listSeenAuctionIds(prisma, [2292063, 999])).toEqual([2292063]);
-    expect(await listSeenAuctionIds(prisma, [999])).toEqual([]);
-    expect(await listSeenAuctionIds(prisma, [])).toEqual([]);
-  });
-
   it('reupsert do mesmo id não duplica e atualiza o lance', async () => {
     await upsertAuction(prisma, entry(1, { bid: { amount: 10, kind: 'minimum' } }));
     await upsertAuction(prisma, entry(1, { bid: { amount: 99, kind: 'current' } }));
 
-    expect(await listSeenAuctionIds(prisma, [1])).toEqual([1]);
+    expect(await prisma.auction.count()).toBe(1);
 
     const row = await prisma.auction.findUniqueOrThrow({ where: { auctionId: 1 } });
     expect(row.currentBid).toBe(99);
     expect(row.minBid).toBeNull();
   });
 
-  it('recordMatch liga auction e watch_filter, devolvendo true só na primeira vez', async () => {
+  it('hasMatch/recordMatch: marca idempotente e hasMatch reflete', async () => {
     await upsertAuction(prisma, entry(2292063));
     const filter = await prisma.watchFilter.create({ data: {} });
 
-    expect(await recordMatch(prisma, 2292063, filter.id)).toBe(true);
-    expect(await recordMatch(prisma, 2292063, filter.id)).toBe(false);
+    expect(await hasMatch(prisma, 2292063, filter.id)).toBe(false);
+
+    await recordMatch(prisma, 2292063, filter.id);
+    await recordMatch(prisma, 2292063, filter.id);
+
+    expect(await hasMatch(prisma, 2292063, filter.id)).toBe(true);
     expect(await prisma.auctionMatch.count()).toBe(1);
   });
 });
