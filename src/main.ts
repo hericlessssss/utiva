@@ -14,8 +14,8 @@ import { ensureQueues, registerNewAuctionWorker } from './queue/new-auction-queu
  */
 async function main(): Promise<void> {
   const cfg = loadConfig(process.env);
-  const app = buildApp();
   const prisma = new PrismaClient();
+  const app = buildApp({ prisma });
   const boss = new PgBoss(cfg.databaseUrl);
 
   await boss.start();
@@ -26,7 +26,7 @@ async function main(): Promise<void> {
     to: cfg.resend.to,
   });
 
-  startScraperCron(cfg.scrapeCron, async () => {
+  const cronHandle = startScraperCron(cfg.scrapeCron, async () => {
     const enqueued = await enqueueNewForActiveFilters(prisma, boss, { cfClearance: cfg.cfClearance });
     if (enqueued > 0) app.log.info(`enfileirados ${enqueued} alerta(s) de char novo`);
   });
@@ -39,6 +39,7 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     app.log.info(`${signal} recebido — encerrando...`);
+    cronHandle.stop(); // para de agendar novos ticks antes de drenar
     await app.close();
     await boss.stop();
     await prisma.$disconnect();

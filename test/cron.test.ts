@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { startScraperCron, type Scheduler } from '../src/cron.js';
 
+const noopHandle = { stop: () => {} };
+
 describe('startScraperCron', () => {
   it('agenda a task na expressão dada e a executa quando o schedule dispara', async () => {
     let registered: (() => void) | undefined;
@@ -8,6 +10,7 @@ describe('startScraperCron', () => {
     const schedule: Scheduler = (e, task) => {
       expr = e;
       registered = task;
+      return noopHandle;
     };
     const run = vi.fn(() => Promise.resolve());
 
@@ -24,6 +27,7 @@ describe('startScraperCron', () => {
     let registered: (() => void) | undefined;
     const schedule: Scheduler = (_e, task) => {
       registered = task;
+      return noopHandle;
     };
 
     startScraperCron('* * * * *', () => Promise.reject(new Error('boom')), schedule);
@@ -36,6 +40,7 @@ describe('startScraperCron', () => {
     let registered: (() => void) | undefined;
     const schedule: Scheduler = (_e, task) => {
       registered = task;
+      return noopHandle;
     };
     let resolveFirst!: () => void;
     const first = new Promise<void>((r) => {
@@ -48,14 +53,23 @@ describe('startScraperCron', () => {
     });
 
     startScraperCron('* * * * *', task, schedule);
-    registered!(); // 1º tick começa e fica pendente
-    registered!(); // 2º tick enquanto o 1º roda → pulado
+    registered!();
+    registered!();
     expect(task).toHaveBeenCalledTimes(1);
 
     resolveFirst();
     await new Promise((r) => setTimeout(r, 0));
 
-    registered!(); // 1º terminou → 3º tick roda
+    registered!();
     expect(task).toHaveBeenCalledTimes(2);
+  });
+
+  it('devolve um handle que repassa o stop para o schedule', () => {
+    const stop = vi.fn();
+    const schedule: Scheduler = () => ({ stop });
+
+    startScraperCron('* * * * *', () => Promise.resolve(), schedule).stop();
+
+    expect(stop).toHaveBeenCalledTimes(1);
   });
 });
