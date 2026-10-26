@@ -60,9 +60,22 @@ model Auction {
   lastSeenAt  DateTime      @default(now()) @map("last_seen_at") @db.Timestamptz
 
   matches AuctionMatch[]
+  watched WatchedAuction?
 
   @@index([status, endAt])
   @@map("auction")
+}
+
+/// Leilão que o usuário marcou para acompanhar (toggle) — dispara os lembretes de fim (§7-B).
+model WatchedAuction {
+  auctionId Int      @id @map("auction_id")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  auction Auction @relation(fields: [auctionId], references: [auctionId], onDelete: Cascade)
+
+  @@map("watched_auction")
 }
 
 /// Liga um leilão ao watch_filter que o capturou (para saber por que alertou).
