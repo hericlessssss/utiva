@@ -24,7 +24,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # RESEND_API_KEY / MAIL_FROM / MAIL_TO (e demais) vêm do .env local.
+    env_file:
+      - .env
     environment:
+      # Sobrescrevem o .env: dentro do compose o banco é 'db:5432', não 127.0.0.1:5433.
       PORT: 3000
       HOST: 0.0.0.0
       DATABASE_URL: postgresql://utiva:utiva@db:5432/utiva
