@@ -1,0 +1,3 @@
+# web/ é um projeto pnpm independente do backend (este arquivo o torna raiz própria).
+allowBuilds:
+  esbuild: true

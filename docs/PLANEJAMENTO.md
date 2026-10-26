@@ -41,6 +41,7 @@ Comprar personagens no **Char Bazaar oficial do Tibia** exige vigiar a lista de 
 | 6 | **pg-boss** (fila/scheduler em Postgres) | BullMQ + Redis | MVP pessoal não precisa de Redis; menos peças no monólito |
 | 7 | **Resend** (e-mail) | SES/SMTP | DX simples p/ beta |
 | 8 | **Monólito** em Docker Compose (local) → **VM GCP (e2-small)** | Cloud Run | Cron always-on + browser ocasional caem mal em serverless |
+| 9 | **Frontend em `web/`: Vite + React + TS, CSS puro com tokens, `react-router`**; projeto pnpm próprio, fora do workspace/Dockerfile | Next/Remix, lib de UI, Tailwind | Painel pessoal, 3 telas, sem SSR nem auth; visual artesanal (pixel/medieval) não combina com kit de componentes. Em dev o Vite faz proxy de `/api` → API. Em prod a própria API serve o `web/dist` na mesma origem (`@fastify/static` + fallback SPA pro `index.html` em GET que aceita html; `WEB_DIST` no env, stage `web` no Dockerfile) — sem CORS, uma porta só. Por isso as rotas do painel são em pt-BR (`/`, `/leiloes/:id`, `/filtros`): não colidem com as da API (`/auctions`, `/filters`) |
 
 ---
 
@@ -149,7 +150,8 @@ Ao marcar `watched_auction`, calcular os thresholds a partir de `end_at` e agend
 
 - **Nome: `Utiva`** (definido). Cunhado a partir das sílabas mágicas do Tibia: **`ut`** (over time / contínuo) + **`iva`** (locate — a sílaba da única magia de *encontrar alguém*, o **Find Person** = `exiva <nome>`). Significa, sem forçar, **"localização contínua de personagem"** — o produto numa palavra. Segue a mesma lógica do "Exevo Pan" (a magia *Conjure Food*, `exevo`+`pan`).
 - **Pendente:** registrar domínio (`.com`/`.gg`) e handle no GitHub; confirmar disponibilidade antes do deploy público.
-- **Design:** fonte pixel nos títulos (Press Start 2P / Silkscreen / VT323) + corpo legível (Inter); paleta medieval (dourado, vermelho-sangue, pergaminho) em fundo escuro; minimalismo.
+- **Design (definido, implementado em `web/src/styles.css`):** Silkscreen no wordmark e rótulos de seção, VT323 nos números e timers, Inter no corpo. Tokens: `--bg #0f0d0a`, `--surface #17130d`, `--surface-2 #211a11`, `--ink #e7dcc4`, `--muted #9a8f78`, `--gold #e0b64a` (acento), `--blood #a81717` (urgência: timer com menos de 1h vira bloco sangue), `--line #3a3024` (hairline). Cantos retos, sem sombra/gradiente, marcador de 8px em dourado nas linhas acompanhadas, switch pixelado. Só tema escuro; funciona em 360px.
+- **Códigos dos filtros** (lidos do formulário do tibia.com em out/2026, em `web/src/lib/options.ts`): vocação `1` None · `2` Druid · `3` Knight · `4` Paladin · `5` Sorcerer · `6` Monk; skill `1` Magic · `6` Shielding · `7` Distance · `8` Sword · `9` Club · `10` Axe · `11` Fist · `13` Fishing; PvP `0`–`4` (Open, Optional, Hardcore, Retro Open, Retro Hardcore); BattlEye `1` initially protected · `2` protected · `3` not protected. O backend repassa como vem.
 
 ---
 

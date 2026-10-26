@@ -32,6 +32,7 @@ services:
       PORT: 3000
       HOST: 0.0.0.0
       DATABASE_URL: postgresql://utiva:utiva@db:5432/utiva
+      WEB_DIST: /app/web/dist
     ports:
       - '127.0.0.1:3000:3000'
 

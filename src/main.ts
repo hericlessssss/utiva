@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   const cfg = loadConfig(process.env);
   const prisma = new PrismaClient();
   const boss = new PgBoss(cfg.databaseUrl);
-  const app = buildApp({ prisma, boss });
+  const app = buildApp({ prisma, boss, webDist: cfg.webDist });
 
   const mailer = {
     transport: resendTransport(cfg.resend.apiKey),

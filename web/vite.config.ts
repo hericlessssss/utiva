@@ -1,0 +1,20 @@
+/// <reference types="vitest/config" />
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:3000',
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true, // cleanup automático do Testing Library entre testes
+    include: ['src/**/*.test.{ts,tsx}'],
+  },
+});
