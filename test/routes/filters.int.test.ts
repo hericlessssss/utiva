@@ -48,6 +48,18 @@ describe('rotas /filters (integração)', () => {
     expect((await create({ levelFrom: 500, levelTo: 100 })).statusCode).toBe(400);
   });
 
+  it('PATCH rejeita range que fica impossível após merge parcial (400)', async () => {
+    const id = (await create({ levelTo: 10 })).json().id;
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: `/filters/${id}`,
+      payload: { levelFrom: 50 },
+    });
+
+    expect(res.statusCode).toBe(400);
+  });
+
   it('PATCH atualiza o filtro', async () => {
     const id = (await create({})).json().id;
 

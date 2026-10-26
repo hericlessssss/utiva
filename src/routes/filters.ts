@@ -77,14 +77,15 @@ export async function filterRoutes(
     async (req, reply) => {
       const id = Number(req.params.id);
       if (!Number.isInteger(id)) return reply.code(400).send({ error: 'id inválido' });
-      const err = rangeError(req.body);
-      if (err) return reply.code(400).send({ error: err });
-      try {
-        return await prisma.watchFilter.update({ where: { id }, data: req.body });
-      } catch (err) {
-        if (isNotFound(err)) return reply.code(404).send({ error: 'filtro não encontrado' });
-        throw err;
-      }
+
+      const existing = await prisma.watchFilter.findUnique({ where: { id } });
+      if (!existing) return reply.code(404).send({ error: 'filtro não encontrado' });
+
+      // Valida o estado MESCLADO (um update parcial não pode deixar o range impossível).
+      const rangeErr = rangeError({ ...existing, ...req.body });
+      if (rangeErr) return reply.code(400).send({ error: rangeErr });
+
+      return prisma.watchFilter.update({ where: { id }, data: req.body });
     },
   );
 
