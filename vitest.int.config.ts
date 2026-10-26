@@ -10,7 +10,7 @@ function loadDotEnv(path = '.env'): Record<string, string> {
     for (const line of readFileSync(path, 'utf8').split('\n')) {
       if (line.trimStart().startsWith('#')) continue;
       const match = /^\s*([\w.]+)\s*=\s*(.*)\s*$/.exec(line);
-      if (match) env[match[1]!] = match[2]!.trim();
+      if (match) env[match[1]!] = match[2]!.trim().replace(/^(['"])(.*)\1$/, '$2');
     }
     return env;
   } catch {
@@ -23,5 +23,8 @@ export default defineConfig({
     environment: 'node',
     include: ['test/**/*.int.test.ts'],
     env: loadDotEnv(),
+    // Um único Postgres compartilhado: rodar os arquivos em série evita que o
+    // beforeEach (deleteMany) de um arquivo colida com os dados de outro.
+    fileParallelism: false,
   },
 });
