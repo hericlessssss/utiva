@@ -7,6 +7,8 @@ export interface AppConfig {
   resend: { apiKey: string; from: string; to: string };
   cfClearance?: string;
   scrapeCron: string;
+  /** Pasta do build do frontend (`web/dist`) a servir na mesma origem; ausente = só API. */
+  webDist?: string;
 }
 
 type Env = Record<string, string | undefined>;
@@ -31,5 +33,6 @@ export function loadConfig(env: Env): AppConfig {
     },
     cfClearance: env.CF_CLEARANCE?.trim() || undefined,
     scrapeCron: env.SCRAPE_CRON?.trim() || '*/5 * * * *',
+    webDist: env.WEB_DIST?.trim() || undefined,
   };
 }

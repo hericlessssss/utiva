@@ -18,14 +18,22 @@ describe('loadConfig', () => {
     expect(cfg.port).toBe(3000);
     expect(cfg.scrapeCron).toBe('*/5 * * * *');
     expect(cfg.cfClearance).toBeUndefined();
+    expect(cfg.webDist).toBeUndefined();
   });
 
   it('respeita overrides opcionais', () => {
-    const cfg = loadConfig({ ...base, PORT: '8080', SCRAPE_CRON: '*/2 * * * *', CF_CLEARANCE: 'abc' });
+    const cfg = loadConfig({
+      ...base,
+      PORT: '8080',
+      SCRAPE_CRON: '*/2 * * * *',
+      CF_CLEARANCE: 'abc',
+      WEB_DIST: ' /app/web/dist ',
+    });
 
     expect(cfg.port).toBe(8080);
     expect(cfg.scrapeCron).toBe('*/2 * * * *');
     expect(cfg.cfClearance).toBe('abc');
+    expect(cfg.webDist).toBe('/app/web/dist');
   });
 
   it('lança quando falta uma env obrigatória', () => {
