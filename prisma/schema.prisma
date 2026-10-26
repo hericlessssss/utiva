@@ -1,0 +1,94 @@
+// Schema do Utiva — fonte da verdade do schema da aplicação (§6 do planejamento).
+// Escopo atual: fluxo A (detecção de char novo). watched_auction + notification
+// entram com o fluxo B (lembretes de fim). pg-boss mantém as próprias tabelas.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AuctionStatus {
+  active
+  finished
+  cancelled
+}
+
+/// Preset de busca do usuário — mapeia 1:1 os filtros do Char Bazaar (§5).
+model WatchFilter {
+  id        Int      @id @default(autoincrement())
+  world     String?
+  pvpType   String?  @map("pvp_type")
+  battleye  String?
+  vocation  String?
+  levelFrom Int?     @map("level_from")
+  levelTo   Int?     @map("level_to")
+  skillId   String?  @map("skill_id")
+  skillFrom Int?     @map("skill_from")
+  skillTo   Int?     @map("skill_to")
+  search    String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  matches AuctionMatch[]
+
+  @@map("watch_filter")
+}
+
+/// Snapshot de um leilão visto. PK é o auctionid do tibia.com.
+model Auction {
+  auctionId   Int           @id @map("auction_id")
+  charName    String        @map("char_name")
+  world       String
+  vocation    String
+  sex         String
+  level       Int
+  startAt     DateTime?     @map("start_at") @db.Timestamptz
+  endAt       DateTime      @map("end_at") @db.Timestamptz
+  minBid      Int?          @map("min_bid")
+  currentBid  Int?          @map("current_bid")
+  battleye    String?
+  pvpType     String?       @map("pvp_type")
+  flags       Json?
+  attributes  Json?
+  status      AuctionStatus @default(active)
+  firstSeenAt DateTime      @default(now()) @map("first_seen_at") @db.Timestamptz
+  lastSeenAt  DateTime      @default(now()) @map("last_seen_at") @db.Timestamptz
+
+  matches AuctionMatch[]
+  watched WatchedAuction?
+
+  @@index([status, endAt])
+  @@map("auction")
+}
+
+/// Leilão que o usuário marcou para acompanhar (toggle) — dispara os lembretes de fim (§7-B).
+model WatchedAuction {
+  auctionId Int      @id @map("auction_id")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  auction Auction @relation(fields: [auctionId], references: [auctionId], onDelete: Cascade)
+
+  @@map("watched_auction")
+}
+
+/// Liga um leilão ao watch_filter que o capturou (para saber por que alertou).
+model AuctionMatch {
+  id            Int      @id @default(autoincrement())
+  auctionId     Int      @map("auction_id")
+  watchFilterId Int      @map("watch_filter_id")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  auction     Auction     @relation(fields: [auctionId], references: [auctionId], onDelete: Cascade)
+  watchFilter WatchFilter @relation(fields: [watchFilterId], references: [id], onDelete: Cascade)
+
+  @@unique([auctionId, watchFilterId])
+  @@index([watchFilterId])
+  @@map("auction_match")
+}

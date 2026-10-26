@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: utiva
+      POSTGRES_PASSWORD: utiva
+      POSTGRES_DB: utiva
+    ports:
+      - '127.0.0.1:5433:5432'
+    volumes:
+      - utiva_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U utiva']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    # Aplica as migrations do Prisma antes de subir (volume limpo não tem as tabelas).
+    command: sh -c "node_modules/.bin/prisma migrate deploy && node dist/main.js"
+    depends_on:
+      db:
+        condition: service_healthy
+    # RESEND_API_KEY / MAIL_FROM / MAIL_TO (e demais) vêm do .env local.
+    env_file:
+      - .env
+    environment:
+      # Sobrescrevem o .env: dentro do compose o banco é 'db:5432', não 127.0.0.1:5433.
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://utiva:utiva@db:5432/utiva
+    ports:
+      - '127.0.0.1:3000:3000'
+
+volumes:
+  utiva_pgdata:
