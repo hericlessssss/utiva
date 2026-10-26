@@ -48,6 +48,17 @@ export interface SkillEntry {
 export interface ItemEntry {
   name: string;
   count: number;
+  /** Stem do GIF no proxy (ex.: `768`, `136_0`); `null` = sem imagem (cai no texto). */
+  sprite: string | null;
+}
+
+export type SpriteCategory = 'outfits' | 'mounts' | 'objects';
+
+const SPRITE_BASE = (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
+
+/** URL do sprite no nosso proxy (ADR 10): `GET /sprites/:cat/:stem.gif`. */
+export function spriteUrl(category: SpriteCategory, sprite: string): string {
+  return `${SPRITE_BASE}/sprites/${category}/${sprite}.gif`;
 }
 
 export interface CharmEntry {
@@ -63,8 +74,8 @@ export interface AuctionDetail {
   items: ItemEntry[];
   imbuements: string[];
   charms: CharmEntry[];
-  mounts: string[];
-  outfits: string[];
+  mounts: ItemEntry[];
+  outfits: ItemEntry[];
 }
 
 export interface WatchResult {

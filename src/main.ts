@@ -8,6 +8,8 @@ import { resendTransport } from './mailer/resend-transport.js';
 import { finishEndedAuctions } from './db/auction-repo.js';
 import { createCfSession, createFileCredsStore, playwrightRenewer } from './scraper/cf-clearance.js';
 import { runDetailBackfill } from './scraper/tick.js';
+import { tibiaImageFetcher } from './sprites/image-fetcher.js';
+import { createSpriteStore } from './sprites/sprite-store.js';
 import { buildListUrl } from './scraper/url.js';
 import { ensureQueues, registerNewAuctionWorker } from './queue/new-auction-queue.js';
 import { ensureReminderQueue, registerReminderWorker } from './queue/reminder-queue.js';
@@ -21,7 +23,6 @@ async function main(): Promise<void> {
   const cfg = loadConfig(process.env);
   const prisma = new PrismaClient();
   const boss = new PgBoss(cfg.databaseUrl);
-  const app = buildApp({ prisma, boss, webDist: cfg.webDist });
 
   const mailer = {
     transport: resendTransport(cfg.resend.apiKey),
@@ -37,7 +38,7 @@ async function main(): Promise<void> {
 
   // Sessão do cf_clearance: reusa o cookie (env ou arquivo) e, no bloqueio persistente do
   // Cloudflare, renova via Playwright e persiste o cookie novo (§3/§5). O `session.fetchPage`
-  // é injetado no scraper no lugar do fetchPage cru.
+  // é injetado no scraper; o `session.creds` alimenta o proxy de sprites (ADR 10).
   const credsStore = createFileCredsStore(cfg.cfClearanceFile);
   const stored = credsStore.load();
   // cf_clearance é amarrado ao UA que o obteve: nunca parear o cookie do env com o UA do
@@ -52,6 +53,15 @@ async function main(): Promise<void> {
       app.log.info('cf_clearance renovado via Playwright');
     },
   });
+
+  // Proxy com cache dos sprites do bazar (ADR 10): baixa do static.tibia.com com as creds da
+  // sessão cf (hotlink direto do browser dá 403) e cacheia em disco.
+  const spriteStore = createSpriteStore({
+    dir: cfg.spriteCacheDir,
+    fetchImage: tibiaImageFetcher(session.creds),
+  });
+
+  const app = buildApp({ prisma, boss, webDist: cfg.webDist, spriteStore });
 
   const cronHandle = startScraperCron(cfg.scrapeCron, async () => {
     const enqueued = await enqueueNewForActiveFilters(prisma, boss, {}, session.fetchPage);

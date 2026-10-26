@@ -26,18 +26,25 @@ function sampleDetail(): AuctionDetail {
       { name: 'Distance Fighting', level: 15, percent: 0 },
     ],
     items: [
-      { name: 'falcon longsword', count: 1 },
-      { name: 'soulcutter', count: 1 },
-      { name: 'crystal coin', count: 86 },
-      { name: 'supreme health potion', count: 1200 },
+      { name: 'falcon longsword', count: 1, sprite: '25383' },
+      { name: 'soulcutter', count: 1, sprite: '38935' },
+      { name: 'crystal coin', count: 86, sprite: '3043' },
+      { name: 'supreme health potion', count: 1200, sprite: '23375' },
     ],
     imbuements: ['Powerful Vampirism', 'Powerful Strike', 'Powerful Void'],
     charms: [
       { name: 'Wound', type: 'Major', grade: '1' },
       { name: 'Dodge', type: 'Minor', grade: '1' },
     ],
-    mounts: ['War Bear', 'Gryphon', 'Tamed Panda'],
-    outfits: ['Knight (base)', 'Elite Knight (base & addon 1 & addon 2)'],
+    mounts: [
+      { name: 'War Bear', count: 1, sprite: '370' },
+      { name: 'Gryphon', count: 1, sprite: '389' },
+      { name: 'Tamed Panda', count: 1, sprite: '402' },
+    ],
+    outfits: [
+      { name: 'Knight (base)', count: 1, sprite: '139_0' },
+      { name: 'Elite Knight (base & addon 1 & addon 2)', count: 1, sprite: '139_3' },
+    ],
   };
 }
 

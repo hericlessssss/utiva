@@ -35,7 +35,10 @@ describe('AuctionPage', () => {
     expect(await screen.findByRole('heading', { name: 'Skills' })).toBeTruthy();
     expect(screen.getByText('Axe Fighting')).toBeTruthy();
     expect(screen.getByText('Powerful Vampirism')).toBeTruthy();
-    expect(screen.getByText('86× crystal coin')).toBeTruthy();
+    // Itens viram ícones (sprite do proxy): nome no alt, quantidade no badge.
+    const coin = screen.getByAltText('crystal coin') as HTMLImageElement;
+    expect(coin.src).toContain('/sprites/objects/3043.gif');
+    expect(screen.getByText('86')).toBeTruthy();
   });
 
   it('sem detalhe ainda, mostra o aviso de não carregado', async () => {

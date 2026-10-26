@@ -1,7 +1,13 @@
 import { useCallback, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useApi } from '../api/context';
-import { AUCTION_DETAIL_URL, type AuctionDetail } from '../api/types';
+import {
+  AUCTION_DETAIL_URL,
+  type AuctionDetail,
+  type ItemEntry,
+  type SpriteCategory,
+  spriteUrl,
+} from '../api/types';
 import { Switch } from '../components/Switch';
 import { Timer } from '../components/Timer';
 import { formatDate, formatGold } from '../lib/auction-list';
@@ -77,9 +83,9 @@ export function AuctionPage() {
 
       <dl className="fields">
         <dt>Lance atual</dt>
-        <dd className="num">{formatGold(a.currentBid)}</dd>
+        <dd className="num bid"><Coin />{formatGold(a.currentBid)}</dd>
         <dt>Lance mínimo</dt>
-        <dd className="num">{formatGold(a.minBid)}</dd>
+        <dd className="num bid"><Coin />{formatGold(a.minBid)}</dd>
         <dt>Status</dt>
         <dd>{STATUS[a.status] ?? a.status}</dd>
         <dt>Sexo</dt>
@@ -109,7 +115,17 @@ export function AuctionPage() {
   );
 }
 
-/** Lista de nomes como chips (itens/imbuements/mounts/outfits), omitida se vazia. */
+/** Moeda do bazar (Tibia Coins): glifo inline, sem depender de asset externo. */
+function Coin() {
+  return (
+    <svg className="coin" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <circle cx="8" cy="8" r="7" fill="#f4c542" stroke="#9a6b00" strokeWidth="1" />
+      <circle cx="8" cy="8" r="4.3" fill="none" stroke="#9a6b00" strokeWidth="1" opacity="0.7" />
+    </svg>
+  );
+}
+
+/** Lista de nomes como chips (imbuements), omitida se vazia. */
 function ChipList({ label, names }: { label: string; names: string[] }) {
   if (names.length === 0) return null;
   return (
@@ -122,6 +138,49 @@ function ChipList({ label, names }: { label: string; names: string[] }) {
           <li key={`${name}-${i}`} className="chip">
             {name}
           </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * Um ícone do bazar (item/mount/outfit): o GIF do proxy com o nome no `title`/`alt` e, p/ itens,
+ * o badge de quantidade. Sem sprite — ou se a imagem falhar (parser frágil, 404 do proxy) — cai
+ * no nome em texto, sem buraco na tela.
+ */
+function Sprite({ category, item }: { category: SpriteCategory; item: ItemEntry }) {
+  const [failed, setFailed] = useState(false);
+  const label = item.count > 1 ? `${item.count}× ${item.name}` : item.name;
+
+  if (!item.sprite || failed) {
+    return <li className="icon-cell icon-cell--text">{label}</li>;
+  }
+  return (
+    <li className="icon-cell" title={label}>
+      <img
+        className="sprite"
+        src={spriteUrl(category, item.sprite)}
+        alt={item.name}
+        loading="lazy"
+        onError={() => setFailed(true)}
+      />
+      {item.count > 1 && <span className="icon-count">{item.count}</span>}
+    </li>
+  );
+}
+
+/** Grade de ícones (itens/mounts/outfits), omitida se vazia. */
+function IconGrid({ label, category, items }: { label: string; category: SpriteCategory; items: ItemEntry[] }) {
+  if (items.length === 0) return null;
+  return (
+    <section className="attr-section">
+      <h2 className="section-label">
+        {label} <span className="num">{items.length}</span>
+      </h2>
+      <ul className="icon-grid">
+        {items.map((item, i) => (
+          <Sprite key={`${item.name}-${i}`} category={category} item={item} />
         ))}
       </ul>
     </section>
@@ -141,6 +200,9 @@ function AuctionAttributes({ detail }: { detail: AuctionDetail }) {
               <li key={s.name} className="skill-row">
                 <span className="skill-name">{s.name}</span>
                 <span className="num skill-level">{s.level}</span>
+                <span className="skill-bar">
+                  <span className="skill-bar-fill" style={{ width: `${s.percent}%` }} />
+                </span>
                 <span className="muted skill-pct">{s.percent}%</span>
               </li>
             ))}
@@ -168,9 +230,9 @@ function AuctionAttributes({ detail }: { detail: AuctionDetail }) {
       )}
 
       <ChipList label="Imbuements" names={detail.imbuements} />
-      <ChipList label="Itens" names={detail.items.map((i) => (i.count > 1 ? `${i.count}× ${i.name}` : i.name))} />
-      <ChipList label="Mounts" names={detail.mounts} />
-      <ChipList label="Outfits" names={detail.outfits} />
+      <IconGrid label="Itens" category="objects" items={detail.items} />
+      <IconGrid label="Mounts" category="mounts" items={detail.mounts} />
+      <IconGrid label="Outfits" category="outfits" items={detail.outfits} />
 
       {general.length > 0 && (
         <section className="attr-section">

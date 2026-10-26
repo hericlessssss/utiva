@@ -8,5 +8,8 @@ coverage/
 # cookie cf_clearance renovado (runtime, não versionar)
 .cf-clearance.json
 
+# cache dos sprites do bazar (runtime, ADR 10)
+.sprite-cache/
+
 # cache do Vite (frontend)
 web/.vite/

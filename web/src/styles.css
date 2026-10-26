@@ -530,8 +530,8 @@ button.danger {
 
 .skill-row {
   display: grid;
-  grid-template-columns: 1fr max-content max-content;
-  align-items: baseline;
+  grid-template-columns: max-content max-content 1fr max-content;
+  align-items: center;
   gap: 0 16px;
   padding: 8px 0;
   border-top: 1px solid var(--line);
@@ -541,14 +541,90 @@ button.danger {
   border-top: none;
 }
 
+.skill-name {
+  min-width: 112px;
+}
+
 .skill-level {
   color: var(--gold);
   font-size: 18px;
 }
 
+/* Barra de progresso da skill (% até o próximo nível). Sem asset: CSS puro. */
+.skill-bar {
+  height: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.skill-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--gold);
+}
+
 .skill-pct {
   min-width: 68px;
   text-align: right;
+}
+
+/* ---------- grade de ícones (itens/mounts/outfits) ---------- */
+.icon-grid {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.icon-cell {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.icon-cell .sprite {
+  max-width: 34px;
+  max-height: 34px;
+  image-rendering: pixelated; /* sprites são pixel art: não borrar ao escalar */
+}
+
+/* Fallback de texto quando não há sprite (ou a imagem falha): célula vira chip largo. */
+.icon-cell--text {
+  width: auto;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.icon-count {
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  padding: 0 2px;
+  font: 11px/1.2 var(--font-num);
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.72);
+}
+
+/* ---------- moeda (Tibia Coins) ---------- */
+.bid {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.coin {
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 
 .chips {
