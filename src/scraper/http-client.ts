@@ -45,9 +45,16 @@ function looksLikeChallenge(body: string): boolean {
   return CHALLENGE_MARKERS.some((re) => re.test(body));
 }
 
-/** `fetch` nativo do Node (undici por baixo); segue redirects legítimos. */
+const DEFAULT_TIMEOUT_MS = 15_000;
+
+/** `fetch` nativo do Node (undici por baixo); segue redirects e aborta se travar. */
 export const defaultFetcher: Fetcher = async (url, headers) => {
-  const res = await fetch(url, { method: 'GET', headers, redirect: 'follow' });
+  const res = await fetch(url, {
+    method: 'GET',
+    headers,
+    redirect: 'follow',
+    signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+  });
   return { statusCode: res.status, body: await res.text() };
 };
 
@@ -75,7 +82,8 @@ export async function fetchPage(url: string, opts: FetchPageOptions = {}): Promi
   };
   if (cfClearance) headers.cookie = `cf_clearance=${cfClearance}`;
 
-  let blockedByChallenge = false;
+  // Reflete só a ÚLTIMA tentativa: um 403 inicial não deve mascarar um 429/503 final.
+  let lastWasChallenge = false;
   let lastStatus = 0;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -86,15 +94,15 @@ export async function fetchPage(url: string, opts: FetchPageOptions = {}): Promi
 
     if (res.statusCode === 200) {
       if (!looksLikeChallenge(res.body)) return res.body;
-      blockedByChallenge = true; // 200 mas challenge → trata como bloqueio e tenta de novo
+      lastWasChallenge = true; // 200 mas challenge → trata como bloqueio e tenta de novo
       continue;
     }
     if (!RETRYABLE.has(res.statusCode)) {
       throw new Error(`GET ${url} falhou: HTTP ${res.statusCode}`);
     }
-    if (res.statusCode === 403) blockedByChallenge = true;
+    lastWasChallenge = res.statusCode === 403; // 429/503 = throttle, não challenge
   }
 
-  if (blockedByChallenge) throw new CloudflareBlockedError(url, maxRetries + 1);
+  if (lastWasChallenge) throw new CloudflareBlockedError(url, maxRetries + 1);
   throw new Error(`GET ${url} falhou após ${maxRetries + 1} tentativa(s): HTTP ${lastStatus}`);
 }

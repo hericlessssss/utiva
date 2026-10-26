@@ -98,6 +98,14 @@ describe('fetchPage', () => {
     expect(q.calls).toBe(2);
   });
 
+  it('403 inicial seguido de 503 esgota como transitório (olha a última tentativa)', async () => {
+    const q = responder([status(403), status(503)]);
+
+    await expect(
+      fetchPage('http://x', opts(q.fetcher, { maxRetries: 3 })),
+    ).rejects.not.toBeInstanceOf(CloudflareBlockedError);
+  });
+
   it('lança erro genérico (sem retry) para status não-retryável', async () => {
     const q = responder([status(404)]);
 
