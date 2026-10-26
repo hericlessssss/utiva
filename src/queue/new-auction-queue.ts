@@ -38,7 +38,12 @@ export async function enqueueNewAuction(boss: PgBoss, entry: AuctionListEntry): 
   });
 }
 
-/** Registra o worker que consome os jobs e envia o e-mail via mailer. */
+/**
+ * Registra o worker que consome os jobs e envia o e-mail via mailer.
+ * Assume batchSize=1 (default): cada batch traz 1 job, então um erro re-tenta só esse job.
+ * Se um dia batchSize for aumentado, isolar cada job (try/catch por item) pra não re-enviar
+ * os já entregues no mesmo batch.
+ */
 export async function registerNewAuctionWorker(boss: PgBoss, mailer: MailerConfig): Promise<void> {
   await boss.work<NewAuctionJob>(NEW_AUCTION_QUEUE, async (jobs) => {
     for (const job of jobs) {
