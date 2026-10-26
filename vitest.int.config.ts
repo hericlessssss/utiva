@@ -26,5 +26,8 @@ export default defineConfig({
     // Um único Postgres compartilhado: rodar os arquivos em série evita que o
     // beforeEach (deleteMany) de um arquivo colida com os dados de outro.
     fileParallelism: false,
+    // pg-boss (start + polling) é mais lento que uma query avulsa.
+    testTimeout: 20_000,
+    hookTimeout: 20_000,
   },
 });
