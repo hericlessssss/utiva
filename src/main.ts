@@ -6,6 +6,7 @@ import { startScraperCron } from './cron.js';
 import { enqueueNewForActiveFilters } from './flow.js';
 import { resendTransport } from './mailer/resend-transport.js';
 import { ensureQueues, registerNewAuctionWorker } from './queue/new-auction-queue.js';
+import { ensureReminderQueue, registerReminderWorker } from './queue/reminder-queue.js';
 
 /**
  * Entrypoint do monólito (§3 ADR 8): sobe API (Fastify) + fila/worker (pg-boss) +
@@ -15,16 +16,20 @@ import { ensureQueues, registerNewAuctionWorker } from './queue/new-auction-queu
 async function main(): Promise<void> {
   const cfg = loadConfig(process.env);
   const prisma = new PrismaClient();
-  const app = buildApp({ prisma });
   const boss = new PgBoss(cfg.databaseUrl);
+  const app = buildApp({ prisma, boss });
 
-  await boss.start();
-  await ensureQueues(boss);
-  await registerNewAuctionWorker(boss, {
+  const mailer = {
     transport: resendTransport(cfg.resend.apiKey),
     from: cfg.resend.from,
     to: cfg.resend.to,
-  });
+  };
+
+  await boss.start();
+  await ensureQueues(boss);
+  await ensureReminderQueue(boss);
+  await registerNewAuctionWorker(boss, mailer);
+  await registerReminderWorker(boss, { prisma, mailer });
 
   const cronHandle = startScraperCron(cfg.scrapeCron, async () => {
     const enqueued = await enqueueNewForActiveFilters(prisma, boss, { cfClearance: cfg.cfClearance });
