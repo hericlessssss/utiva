@@ -1,11 +1,44 @@
 import type { AuctionsApi } from './auctions';
 import { ApiError } from './http';
-import type { Auction } from './types';
+import type { Auction, AuctionDetail } from './types';
 
 const H = 3_600_000;
 
 function iso(offsetMs: number): string {
   return new Date(Date.now() + offsetMs).toISOString();
+}
+
+/** Detalhe (fase 2) fictício para um char knight, pra a tela de detalhe ter o que mostrar no mock. */
+function sampleDetail(): AuctionDetail {
+  return {
+    general: {
+      'Hit Points': '9,450',
+      Mana: '2,100',
+      Capacity: '12,340',
+      Speed: '812',
+      'Achievement Points': '612',
+      Experience: '18,920,004,112',
+    },
+    skills: [
+      { name: 'Magic Level', level: 14, percent: 22.5 },
+      { name: 'Axe Fighting', level: 121, percent: 88.3 },
+      { name: 'Shielding', level: 118, percent: 4.1 },
+      { name: 'Distance Fighting', level: 15, percent: 0 },
+    ],
+    items: [
+      { name: 'falcon longsword', count: 1 },
+      { name: 'soulcutter', count: 1 },
+      { name: 'crystal coin', count: 86 },
+      { name: 'supreme health potion', count: 1200 },
+    ],
+    imbuements: ['Powerful Vampirism', 'Powerful Strike', 'Powerful Void'],
+    charms: [
+      { name: 'Wound', type: 'Major', grade: '1' },
+      { name: 'Dodge', type: 'Minor', grade: '1' },
+    ],
+    mounts: ['War Bear', 'Gryphon', 'Tamed Panda'],
+    outfits: ['Knight (base)', 'Elite Knight (base & addon 1 & addon 2)'],
+  };
 }
 
 /** Leilões fictícios com nomes inventados; estrutura igual à do backend. */
@@ -36,6 +69,8 @@ function seed(): Auction[] {
     status: endsIn > 0 ? 'active' : 'finished',
     firstSeenAt: iso(-(1874211 - auctionId) * 60_000),
     lastSeenAt: iso(-60_000),
+    // Só o primeiro char tem detalhe (fase 2) no mock; os outros simulam "ainda não detalhado".
+    ...(auctionId === 1874211 ? { attributes: sampleDetail() } : {}),
     ...(watched ? { watched: { enabled: true } } : {}),
   }));
 }

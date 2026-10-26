@@ -509,6 +509,69 @@ button.danger {
   padding-top: 7px;
 }
 
+/* ---------- detalhe: atributos (fase 2) ---------- */
+.attrs {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.attr-section .section-label .num {
+  margin-left: 6px;
+  color: var(--gold);
+}
+
+.skills {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.skill-row {
+  display: grid;
+  grid-template-columns: 1fr max-content max-content;
+  align-items: baseline;
+  gap: 0 16px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.skill-row:first-child {
+  border-top: none;
+}
+
+.skill-level {
+  color: var(--gold);
+  font-size: 18px;
+}
+
+.skill-pct {
+  min-width: 68px;
+  text-align: right;
+}
+
+.chips {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 4px 10px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.chip .muted {
+  color: var(--muted);
+  margin-left: 4px;
+}
+
 /* ---------- filtros ---------- */
 
 .filter-form {

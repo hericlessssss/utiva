@@ -25,9 +25,23 @@ describe('AuctionPage', () => {
     expect(await screen.findByRole('heading', { name: 'Lirael Moonwhisper' })).toBeTruthy();
     const link = screen.getByRole('link', { name: 'abrir no tibia.com' });
     expect(link.getAttribute('href')).toBe(
-      'https://www.tibia.com/charactertrade/?subtopic=auctiondetails&auctionid=1874207',
+      'https://www.tibia.com/charactertrade/?subtopic=currentcharactertrades&page=details&source=overview&auctionid=1874207',
     );
     expect(document.querySelector('time.timer-big')).not.toBeNull();
+  });
+
+  it('renderiza o detalhe (fase 2): skills, itens e imbuements', async () => {
+    renderAt('/leiloes/1874211', { auctions: createMockAuctions() });
+    expect(await screen.findByRole('heading', { name: 'Skills' })).toBeTruthy();
+    expect(screen.getByText('Axe Fighting')).toBeTruthy();
+    expect(screen.getByText('Powerful Vampirism')).toBeTruthy();
+    expect(screen.getByText('86× crystal coin')).toBeTruthy();
+  });
+
+  it('sem detalhe ainda, mostra o aviso de não carregado', async () => {
+    renderAt('/leiloes/1874196', { auctions: createMockAuctions() });
+    await screen.findByRole('heading', { name: 'Brann Ironfist' });
+    expect(screen.getByText('Detalhe ainda não carregado.')).toBeTruthy();
   });
 
   it('toggle de acompanhar chama a API e reflete o estado', async () => {

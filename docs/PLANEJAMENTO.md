@@ -77,7 +77,7 @@ Comprar personagens no **Char Bazaar oficial do Tibia** exige vigiar a lista de 
 | `currentpage` | paginação (~24 itens/página) |
 
 **Detalhe do leilão:**
-`GET /charactertrade/?subtopic=auctiondetails&auctionid=<id>` — traz o breakdown completo (skills, itens, imbuements, charms, outfits, mounts, store items).
+`GET /charactertrade/?subtopic=currentcharactertrades&page=details&source=overview&auctionid=<id>` — traz o breakdown (skills, itens, imbuements, charms, outfits, mounts, store items). **Atenção:** `subtopic=auctiondetails` **não** existe (só reexibe a lista); a URL correta usa `page=details` (confirmado nos links da própria lista). A página **trunca** listas longas, marcando o corte com `(N more entries)` / mostrando só parte do `Results: N` — capturamos o que é exibido.
 
 **Estratégia de detecção (2 fases, barata):**
 1. Para cada **preset de filtro** do usuário, pedir a lista ordenada por **Start Date desc**, ler só a **página 1** → coletar `auctionid`s.
@@ -159,7 +159,10 @@ Ao marcar `watched_auction`, calcular os thresholds a partir de `end_at` e agend
 
 - **Fragilidade de parser** (CipSoft muda HTML) → mitigado por contract tests e fixtures.
 - **Cloudflare aperta** → fallback FlareSolverr/ScraperAPI já previsto.
+- **Resolvido (renovação de cf_clearance):** `src/scraper/cf-clearance.ts` — `createCfSession` reusa o cookie e, no `CloudflareBlockedError` (403/challenge persistente), renova via **Playwright** (`playwrightRenewer`: abre o Chromium, deixa o challenge setar o `cf_clearance`, devolve cookie + UA) e re-tenta uma vez; single-flight; persiste em arquivo (`CF_CLEARANCE_FILE`, default `.cf-clearance.json`). O UA do browser (`HeadlessChrome/…`) acompanha o cookie nos requests HTTP seguintes (o cf_clearance é amarrado ao UA). `main` injeta `session.fetchPage` no scraper. **Cautela:** o cookie só é setado quando o site realmente desafia; sem challenge (hoje o HTTP puro passa) o renovador não tem o que resolver — é fallback, não caminho normal. Se o headless começar a ser barrado, `headless:false` ou um UA custom são os próximos passos.
 - **Resolvido (smoke ao vivo):** usar **`order_direction=0`** — é o que traz os chars mais novos na página 1 (dir=1 deixava-os de fora, quebrando a detecção). HTTP puro passou o Cloudflare sem `cf_clearance`.
-- **Validar:** janela diária de `Auction Start`; expiração real do `cf_clearance`; cobertura de todos os campos do detalhe; limites de rate aceitáveis.
+- **Resolvido (fase 2):** detalhe parseado por id estável de seção (`div.CharacterDetailsBlock#General|ItemSummary|Imbuements|Charms|Mounts|Outfits`), não por texto de cabeçalho; persistido em `auction.attributes` (jsonb) por um backfill que detalha quem tem `attributes` nulo (cap por ciclo, para no `CloudflareBlockedError`). Escopo v1: general (stats), skills, items, imbuements, charms, mounts, outfits. **Fora do escopo v1 (YAGNI):** store items, familiars, blessings, bestiary/bosstiary, achievements, titles, quest lines, gems, proficiencies.
+- **Limitação conhecida (detalhe):** a página trunca listas longas (`(N more entries)`), então `items`/`imbuements`/etc. podem vir parciais — aceitável p/ v1 (snapshot do que o site exibe sem login).
+- **Validar:** janela diária de `Auction Start`; expiração real do `cf_clearance`; limites de rate aceitáveis.
 - **Hardening adiado (YAGNI p/ v1 local/single-user):** lote nas escritas do tick (hoje ~2 queries/leilão, irrelevante no Postgres local); `min_bid`/`current_bid` são `int4` (estouraria acima de ~2,1 bi TC — valor irreal hoje) → migrar p/ `bigint` se necessário; **`auction.status` nunca transiciona** (fica sempre `active`) — falta uma varredura que marque `finished`/`cancelled` quando o leilão some da lista. Os lembretes já se protegem por `end_at` (não dependem de `status`).
 - **Decidir depois:** domínio + handle GitHub; identidade visual; **se um char que casa N presets deve gerar N e-mails** (hoje sim — novidade é por-filtro, cada preset alerta e registra seu `auction_match`) **ou 1 e-mail** (dedup do alerta mantendo os matches). Em v1 (poucos presets, pouca sobreposição) o atual é aceitável.

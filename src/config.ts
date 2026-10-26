@@ -6,6 +6,8 @@ export interface AppConfig {
   databaseUrl: string;
   resend: { apiKey: string; from: string; to: string };
   cfClearance?: string;
+  /** Arquivo onde o cookie cf_clearance renovado é persistido entre restarts (§5). */
+  cfClearanceFile: string;
   scrapeCron: string;
   /** Pasta do build do frontend (`web/dist`) a servir na mesma origem; ausente = só API. */
   webDist?: string;
@@ -32,6 +34,7 @@ export function loadConfig(env: Env): AppConfig {
       to: required(env, 'MAIL_TO'),
     },
     cfClearance: env.CF_CLEARANCE?.trim() || undefined,
+    cfClearanceFile: env.CF_CLEARANCE_FILE?.trim() || '.cf-clearance.json',
     scrapeCron: env.SCRAPE_CRON?.trim() || '*/5 * * * *',
     webDist: env.WEB_DIST?.trim() || undefined,
   };

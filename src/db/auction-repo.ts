@@ -1,4 +1,5 @@
-import type { PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
+import type { AuctionDetail } from '../scraper/detail-parser.js';
 import type { AuctionListEntry } from '../scraper/list-parser.js';
 
 /**
@@ -24,6 +25,41 @@ export async function upsertAuction(prisma: PrismaClient, entry: AuctionListEntr
     where: { auctionId: entry.auctionId },
     create: { auctionId: entry.auctionId, ...fields },
     update: { ...fields, lastSeenAt: new Date() },
+  });
+}
+
+/**
+ * IDs de leilões ainda não detalhados (fase 2): `attributes` nulo, ativos e que ainda não
+ * terminaram (`endAt` no futuro). Excluir os já encerrados evita re-tentar p/ sempre quem
+ * saiu da lista mas nunca foi marcado `finished` (a varredura de fim ainda é pendente, §13) —
+ * senão cada ciclo queimaria requests do tibia.com à toa. Cap por `limit` (§5).
+ */
+export async function auctionsNeedingDetail(
+  prisma: PrismaClient,
+  limit = 10,
+): Promise<number[]> {
+  const rows = await prisma.auction.findMany({
+    where: { status: 'active', attributes: { equals: Prisma.DbNull }, endAt: { gt: new Date() } },
+    orderBy: { firstSeenAt: 'desc' }, // detalha primeiro os mais recentes (os que acabaram de alertar)
+    select: { auctionId: true },
+    take: limit,
+  });
+  return rows.map((r) => r.auctionId);
+}
+
+/**
+ * Persiste o breakdown do detalhe (fase 2) de um leilão em `attributes` (jsonb). NÃO toca em
+ * `lastSeenAt` — esse campo é "visto por último na lista" (fase 1), base da futura varredura
+ * de fim (§13); bumpá-lo aqui faria um leilão que já sumiu da lista parecer recém-visto.
+ */
+export async function saveAuctionDetail(
+  prisma: PrismaClient,
+  auctionId: number,
+  detail: AuctionDetail,
+): Promise<void> {
+  await prisma.auction.update({
+    where: { auctionId },
+    data: { attributes: detail as unknown as Prisma.InputJsonValue },
   });
 }
 

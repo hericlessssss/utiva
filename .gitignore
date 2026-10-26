@@ -4,3 +4,9 @@ coverage/
 .env
 *.log
 .playwright-mcp/
+
+# cookie cf_clearance renovado (runtime, não versionar)
+.cf-clearance.json
+
+# cache do Vite (frontend)
+web/.vite/

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildListUrl } from '../../src/scraper/url.js';
+import { buildDetailUrl, buildListUrl } from '../../src/scraper/url.js';
 
 describe('buildListUrl', () => {
   it('monta a URL base da lista (página 1, ordenada por Start Date)', () => {
@@ -37,5 +37,16 @@ describe('buildListUrl', () => {
 
   it('não emite searchtype quando não há busca', () => {
     expect(new URL(buildListUrl({ world: 'Antica' })).searchParams.has('searchtype')).toBe(false);
+  });
+});
+
+describe('buildDetailUrl', () => {
+  it('monta a URL de detalhe (page=details, não subtopic=auctiondetails)', () => {
+    const url = new URL(buildDetailUrl(2291946));
+
+    expect(url.origin + url.pathname).toBe('https://www.tibia.com/charactertrade/');
+    expect(url.searchParams.get('subtopic')).toBe('currentcharactertrades');
+    expect(url.searchParams.get('page')).toBe('details');
+    expect(url.searchParams.get('auctionid')).toBe('2291946');
   });
 });
