@@ -36,7 +36,7 @@ Estas regras são inegociáveis neste repositório. Valem para toda tarefa de c�
 
 ## Estado atual
 
-**Backend e frontend de v1 implementados** na branch `feat/bootstrap-fluxo-a` (TDD, DoD verde: backend 53 testes unit + 21 de integração; frontend 49 testes; lint/typecheck/build nos dois).
+**v1 na `main`** (PRs #1/#2). **Fase 2 (detalhe do leilão) e renovação de `cf_clearance` na branch `feat/scraper-detalhe-cf-clearance` → PR #3** (TDD, DoD verde: backend 79 unit + integração 10/10 arquivos; frontend 51 testes; lint/typecheck/build nos dois; verificação visual do Detalhe em desktop e 360px).
 
 Implementado:
 - **Fluxo A** (alerta de char novo): cron → scrape fase 1 (`url`→`http-client`→`list-parser`) → detecção **por-filtro** via `auction_match` → fila pg-boss → e-mail via Resend.
