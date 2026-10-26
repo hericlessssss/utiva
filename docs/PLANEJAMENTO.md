@@ -157,5 +157,6 @@ Ao marcar `watched_auction`, calcular os thresholds a partir de `end_at` e agend
 
 - **Fragilidade de parser** (CipSoft muda HTML) → mitigado por contract tests e fixtures.
 - **Cloudflare aperta** → fallback FlareSolverr/ScraperAPI já previsto.
-- **Validar:** janela diária de `Auction Start`; expiração real do `cf_clearance`; cobertura de todos os campos do detalhe; limites de rate aceitáveis.
+- **Validar:** que `order_direction=1` é **descendente** por Start Date (a estratégia de ler só a página 1 depende disso; se for ascendente, nunca vê char novo); janela diária de `Auction Start`; expiração real do `cf_clearance`; cobertura de todos os campos do detalhe; limites de rate aceitáveis.
+- **Hardening adiado (YAGNI p/ v1 local/single-user):** lote nas escritas do tick (hoje ~2 queries/leilão, irrelevante no Postgres local); `min_bid`/`current_bid` são `int4` (estouraria acima de ~2,1 bi TC — valor irreal hoje) → migrar p/ `bigint` se necessário.
 - **Decidir depois:** domínio + handle GitHub; identidade visual.
