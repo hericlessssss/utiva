@@ -1,4 +1,5 @@
 import { createAuctionsApi, type AuctionsApi } from './auctions';
+import { API_BASE } from './base';
 import { createFiltersApi, type FiltersApi } from './filters';
 import { createHttp } from './http';
 import { createMockAuctions } from './mock';
@@ -21,7 +22,4 @@ export function createApi(baseUrl: string, forceMock = false): Api {
   };
 }
 
-export const api = createApi(
-  import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:3000',
-  import.meta.env.VITE_MOCK_AUCTIONS === 'true',
-);
+export const api = createApi(API_BASE, import.meta.env.VITE_MOCK_AUCTIONS === 'true');

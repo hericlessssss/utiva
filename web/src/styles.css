@@ -581,8 +581,8 @@ button.danger {
 
 .icon-cell {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -591,9 +591,20 @@ button.danger {
 }
 
 .icon-cell .sprite {
-  max-width: 34px;
-  max-height: 34px;
+  max-width: 48px;
+  max-height: 48px;
   image-rendering: pixelated; /* sprites são pixel art: não borrar ao escalar */
+}
+
+/* Célula menor para os cards da lista de leilões. */
+.icon-cell--sm {
+  width: 30px;
+  height: 30px;
+}
+
+.icon-cell--sm .sprite {
+  max-width: 26px;
+  max-height: 26px;
 }
 
 /* Fallback de texto quando não há sprite (ou a imagem falha): célula vira chip largo. */
@@ -602,6 +613,31 @@ button.danger {
   padding: 0 10px;
   font-size: 12px;
   color: var(--muted);
+}
+
+.icon-cell--sm.icon-cell--text {
+  padding: 0 6px;
+  font-size: 11px;
+}
+
+/* Card da lista: outfit (avatar) + nome + tira de itens de exibição. */
+.char-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.char-cell-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.char-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
 }
 
 .icon-count {

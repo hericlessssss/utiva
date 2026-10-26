@@ -1,13 +1,8 @@
 import { useCallback, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useApi } from '../api/context';
-import {
-  AUCTION_DETAIL_URL,
-  type AuctionDetail,
-  type ItemEntry,
-  type SpriteCategory,
-  spriteUrl,
-} from '../api/types';
+import { AUCTION_DETAIL_URL, type AuctionDetail, type ItemEntry, type SpriteCategory } from '../api/types';
+import { Sprite } from '../components/Sprite';
 import { Switch } from '../components/Switch';
 import { Timer } from '../components/Timer';
 import { formatDate, formatGold } from '../lib/auction-list';
@@ -145,29 +140,12 @@ function ChipList({ label, names }: { label: string; names: string[] }) {
 }
 
 /**
- * Um ícone do bazar (item/mount/outfit): o GIF do proxy com o nome no `title`/`alt` e, p/ itens,
- * o badge de quantidade. Sem sprite — ou se a imagem falhar (parser frágil, 404 do proxy) — cai
- * no nome em texto, sem buraco na tela.
+ * Normaliza a lista de ícones. Leilões detalhados antes do ADR 10 guardaram mounts/outfits como
+ * `string[]` no jsonb; o backfill não re-busca quem já tem `attributes`, então coagimos aqui:
+ * string vira `{name, sprite:null}` (renderiza como texto), objeto passa direto.
  */
-function Sprite({ category, item }: { category: SpriteCategory; item: ItemEntry }) {
-  const [failed, setFailed] = useState(false);
-  const label = item.count > 1 ? `${item.count}× ${item.name}` : item.name;
-
-  if (!item.sprite || failed) {
-    return <li className="icon-cell icon-cell--text">{label}</li>;
-  }
-  return (
-    <li className="icon-cell" title={label}>
-      <img
-        className="sprite"
-        src={spriteUrl(category, item.sprite)}
-        alt={item.name}
-        loading="lazy"
-        onError={() => setFailed(true)}
-      />
-      {item.count > 1 && <span className="icon-count">{item.count}</span>}
-    </li>
-  );
+function asItems(raw: readonly (string | ItemEntry)[] | undefined | null): ItemEntry[] {
+  return (raw ?? []).map((x) => (typeof x === 'string' ? { name: x, count: 1, sprite: null } : x));
 }
 
 /** Grade de ícones (itens/mounts/outfits), omitida se vazia. */
@@ -178,11 +156,11 @@ function IconGrid({ label, category, items }: { label: string; category: SpriteC
       <h2 className="section-label">
         {label} <span className="num">{items.length}</span>
       </h2>
-      <ul className="icon-grid">
+      <div className="icon-grid">
         {items.map((item, i) => (
           <Sprite key={`${item.name}-${i}`} category={category} item={item} />
         ))}
-      </ul>
+      </div>
     </section>
   );
 }
@@ -230,9 +208,9 @@ function AuctionAttributes({ detail }: { detail: AuctionDetail }) {
       )}
 
       <ChipList label="Imbuements" names={detail.imbuements} />
-      <IconGrid label="Itens" category="objects" items={detail.items} />
-      <IconGrid label="Mounts" category="mounts" items={detail.mounts} />
-      <IconGrid label="Outfits" category="outfits" items={detail.outfits} />
+      <IconGrid label="Itens" category="objects" items={asItems(detail.items)} />
+      <IconGrid label="Mounts" category="mounts" items={asItems(detail.mounts)} />
+      <IconGrid label="Outfits" category="outfits" items={asItems(detail.outfits)} />
 
       {general.length > 0 && (
         <section className="attr-section">

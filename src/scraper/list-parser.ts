@@ -1,4 +1,5 @@
 import { load } from 'cheerio';
+import { type ItemEntry, spriteStem } from './detail-parser.js';
 
 export type BidKind = 'current' | 'minimum';
 
@@ -16,6 +17,10 @@ export interface AuctionListEntry {
   world: string;
   endsAt: Date;
   bid: AuctionBid;
+  /** Stem do GIF do outfit exibido no card (`AuctionOutfitImage`); `null` se ausente. */
+  outfit: string | null;
+  /** Itens que o vendedor escolheu exibir no card (`AuctionItemsViewBox`); slots vazios omitidos. */
+  displayItems: ItemEntry[];
 }
 
 /**
@@ -73,6 +78,22 @@ export function parseAuctionList(html: string): AuctionListEntry[] {
       throw new AuctionListParseError(`card #${i}: label de lance desconhecido "${bidLabel.trim()}"`);
     }
 
+    // Outfit + itens de exibição do card (ADR 10): são sprites servidos pelo tibia.com na própria
+    // lista, então chegam na fase 1 (sem detalhe). Slots vazios do showcase não têm <img> → sprite
+    // nulo → descartados.
+    const outfit = spriteStem(auction.find('.AuctionOutfitImage').attr('src'));
+    const displayItems: ItemEntry[] = auction
+      .find('.AuctionItemsViewBox .CVIcon')
+      .toArray()
+      .map((el) => ({
+        // No showcase da lista o title pode trazer o nome + a descrição do item (separados por
+        // quebra de linha) — fica só a primeira linha (o nome).
+        name: ($(el).attr('title') ?? '').split(/\r?\n/)[0]!.trim(),
+        count: 1,
+        sprite: spriteStem($(el).find('img').attr('src')),
+      }))
+      .filter((item): item is ItemEntry & { sprite: string } => item.sprite !== null);
+
     entries.push({
       auctionId: Number(id[1]),
       characterName: nameLink.text().trim(),
@@ -82,6 +103,8 @@ export function parseAuctionList(html: string): AuctionListEntry[] {
       world,
       endsAt: new Date(Number(timestamp) * 1000),
       bid: { amount: Number(bidDigits), kind: isCurrent ? 'current' : 'minimum' },
+      outfit,
+      displayItems,
     });
   }
 

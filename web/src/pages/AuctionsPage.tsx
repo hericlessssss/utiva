@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useApi } from '../api/context';
 import type { Auction } from '../api/types';
+import { Sprite } from '../components/Sprite';
 import { Switch } from '../components/Switch';
 import { Timer } from '../components/Timer';
 import {
@@ -122,7 +123,26 @@ export function AuctionsPage() {
               return (
                 <tr key={a.auctionId} className={watched ? 'watched' : undefined}>
                   <td className="char">
-                    <Link to={`/leiloes/${a.auctionId}`}>{a.charName}</Link>
+                    <div className="char-cell">
+                      {a.outfit && (
+                        <Sprite
+                          category="outfits"
+                          item={{ name: a.charName, count: 1, sprite: a.outfit }}
+                          size="sm"
+                          hideOnError
+                        />
+                      )}
+                      <div className="char-cell-main">
+                        <Link to={`/leiloes/${a.auctionId}`}>{a.charName}</Link>
+                        {a.displayItems && a.displayItems.length > 0 && (
+                          <div className="char-items">
+                            {a.displayItems.map((item, i) => (
+                              <Sprite key={`${item.name}-${i}`} category="objects" item={item} size="sm" />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </td>
                   <td className="num level">{a.level}</td>
                   <td className="voc">{a.vocation}</td>

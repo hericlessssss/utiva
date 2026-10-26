@@ -36,7 +36,7 @@ Estas regras são inegociáveis neste repositório. Valem para toda tarefa de c�
 
 ## Estado atual
 
-**v1 + Fase 2 + `cf_clearance` + varredura de fim na `main`** (PRs #1–#4 mergeados). **Sprites do bazar (ADR 10) na branch `feat/sprites`** (TDD, DoD verde: backend 85 unit + 32 integração; frontend 51 testes; lint/typecheck/build nos dois; verificação visual do Detalhe em desktop e 360px).
+**v1 + Fase 2 + `cf_clearance` + varredura de fim na `main`** (PRs #1–#4 mergeados). **Sprites do bazar (ADR 10) na branch `feat/sprites`** (TDD, DoD verde: backend 88 unit + 32 integração; frontend 52 testes; lint/typecheck/build nos dois; verificação visual do Detalhe + Lista em desktop e 360px). Inclui, na Lista, o outfit do char e os itens de exibição do card (fase 1).
 
 Implementado:
 - **Fluxo A** (alerta de char novo): cron → scrape fase 1 (`url`→`http-client`→`list-parser`) → detecção **por-filtro** via `auction_match` → fila pg-boss → e-mail via Resend.
@@ -46,7 +46,7 @@ Implementado:
 - **CRUD de `watch_filter`** (`/filters`) e **toggle** (`PUT /auctions/:id/watch`).
 - **Leitura de leilões** (`GET /auctions`, `GET /auctions/:id`, com `watched` incluído).
 - **Varredura de fim:** `finishEndedAuctions` marca `finished` todo leilão `active` com `end_at` vencido; o cron a roda a cada ciclo, antes do backfill (sem rede). `cancelled` fora do escopo v1.
-- **Sprites do bazar (ADR 10):** o `detail-parser` captura o stem do GIF (`ItemEntry.sprite`) dos itens/mounts/outfits; o proxy `GET /sprites/:cat/:file` (`src/sprites/` + `src/routes/sprites.ts`) baixa do static.tibia.com com as creds da sessão cf e cacheia em disco (`SPRITE_CACHE_DIR`, default `.sprite-cache`). O Detalhe renderiza os ícones (grade com badge de qtd, fallback p/ texto), barras de skill (CSS) e o glifo de Tibia Coin nos lances. Imbuement/charm seguem texto (sem ícone no v1).
+- **Sprites do bazar (ADR 10):** o `detail-parser` captura o stem do GIF (`ItemEntry.sprite`) dos itens/mounts/outfits; o `list-parser` captura o outfit (`AuctionOutfitImage`) e os itens de exibição do card (`AuctionItemsViewBox`) na fase 1 → colunas `auction.outfit`/`display_items`. O proxy `GET /sprites/:cat/:file` (`src/sprites/` + `src/routes/sprites.ts`) baixa do static.tibia.com com as creds da sessão cf e cacheia em disco (`SPRITE_CACHE_DIR`, default `.sprite-cache`; só imagem de verdade, single-flight, escrita atômica). O componente `web/src/components/Sprite.tsx` (com fallback p/ texto) é reusado: o Detalhe mostra a grade de ícones + barras de skill (CSS) + glifo de Tibia Coin; a Lista mostra o outfit (avatar) e os itens de exibição por char. Imbuement/charm seguem texto (sem ícone no v1).
 - Entrypoint `src/main.ts`: API Fastify + worker pg-boss + cron (node-cron) no mesmo processo, com shutdown gracioso.
 - **Frontend** em `web/` (Vite + React + TS, CSS puro, `react-router`): telas Leilões, Detalhe e Filtros, timers ao vivo, toggle de acompanhar. Em dev o Vite faz proxy de `/api` → `127.0.0.1:3000`; em prod a API serve o `web/dist` na mesma origem (`WEB_DIST`, `@fastify/static` com fallback SPA), sem CORS. Se `GET /auctions` responder 404, a tela de leilões usa um mock em memória (`web/src/api/mock.ts`); `VITE_MOCK_AUCTIONS=true` força o mock com o backend desligado.
 

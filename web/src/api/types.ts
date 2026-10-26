@@ -1,3 +1,5 @@
+import { API_BASE } from './base';
+
 export interface WatchFilter {
   id: number;
   world: string | null;
@@ -33,6 +35,10 @@ export interface Auction {
   status: AuctionStatus;
   firstSeenAt: string;
   lastSeenAt: string;
+  /** Sprite do outfit exibido no card (stem do GIF); da fase 1 (ADR 10). */
+  outfit?: string | null;
+  /** Itens que o vendedor escolheu exibir no card; da fase 1. */
+  displayItems?: ItemEntry[] | null;
   /** Breakdown da fase 2 (skills/itens/…); ausente/null até o detalhe ser buscado. */
   attributes?: AuctionDetail | null;
   /** Ausente ou null quando nunca foi marcado. */
@@ -54,11 +60,9 @@ export interface ItemEntry {
 
 export type SpriteCategory = 'outfits' | 'mounts' | 'objects';
 
-const SPRITE_BASE = (import.meta.env.VITE_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
-
 /** URL do sprite no nosso proxy (ADR 10): `GET /sprites/:cat/:stem.gif`. */
 export function spriteUrl(category: SpriteCategory, sprite: string): string {
-  return `${SPRITE_BASE}/sprites/${category}/${sprite}.gif`;
+  return `${API_BASE}/sprites/${category}/${sprite}.gif`;
 }
 
 export interface CharmEntry {

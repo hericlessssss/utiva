@@ -35,6 +35,21 @@ describe('parseAuctionList', () => {
     expect(entries[2]!.bid).toEqual({ amount: 1000, kind: 'minimum' });
   });
 
+  it('captura o sprite do outfit do char (AuctionOutfitImage)', () => {
+    expect(entries[0]!.outfit).toBe('1875_3');
+    expect(entries[1]!.outfit).toBe('128_0');
+  });
+
+  it('coleta os itens de exibição do card (pula os slots vazios)', () => {
+    expect(entries[0]!.displayItems).toEqual([]); // "(no item for display selected)"
+    expect(entries[1]!.displayItems).toEqual([
+      { name: 'boots of haste', count: 1, sprite: '3079' },
+      { name: 'magic plate armor', count: 1, sprite: '3366' },
+      { name: 'onyx flail', count: 1, sprite: '7421' },
+      { name: 'bounty talisman', count: 1, sprite: '51978' },
+    ]);
+  });
+
   it('devolve [] para HTML sem nenhum card (lista vazia legítima)', () => {
     expect(parseAuctionList('<div class="BoxContent"></div>')).toEqual([]);
   });

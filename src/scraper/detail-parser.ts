@@ -55,6 +55,11 @@ const COUNT_RE = /^(\d+)x\s+(.*)$/;
 // Stem do sprite na URL do tibia.com: .../charactertrade/<cat>/<stem>.gif (charactertrade é gif-only).
 const SPRITE_RE = /\/charactertrade\/\w+\/([\w-]+)\.gif/;
 
+/** Stem do sprite a partir do `src` de um `<img>` do bazar (ADR 10); `null` se não casar. */
+export function spriteStem(src: string | undefined | null): string | null {
+  return SPRITE_RE.exec(src ?? '')?.[1] ?? null;
+}
+
 /**
  * Ícones de uma seção (itens/mounts/outfits): nome no `title` (com prefixo opcional "Nx") e o
  * stem do sprite extraído do `<img src>` interno (ADR 10). Sem `<img>` reconhecível → `sprite`
@@ -66,7 +71,7 @@ function parseIcons($: CheerioAPI, block: Selection): ItemEntry[] {
     .toArray()
     .map((el) => {
       const title = ($(el).attr('title') ?? '').trim();
-      const sprite = SPRITE_RE.exec($(el).find('img').attr('src') ?? '')?.[1] ?? null;
+      const sprite = spriteStem($(el).find('img').attr('src'));
       const m = COUNT_RE.exec(title);
       return m
         ? { name: m[2]!.trim(), count: Number(m[1]), sprite }

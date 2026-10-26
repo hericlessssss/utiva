@@ -18,6 +18,8 @@ const entry: AuctionListEntry = {
   world: 'Secura',
   endsAt: new Date('2026-10-26T18:00:00Z'),
   bid: { amount: 3000, kind: 'current' },
+  outfit: null,
+  displayItems: [],
 };
 
 const boss = new PgBoss(process.env.DATABASE_URL!);

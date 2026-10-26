@@ -18,6 +18,9 @@ export async function upsertAuction(prisma: PrismaClient, entry: AuctionListEntr
     sex: entry.sex,
     level: entry.level,
     endAt: entry.endsAt,
+    // Outfit + itens de exibição vêm da própria lista (fase 1, ADR 10); atualizados a cada tick.
+    outfit: entry.outfit,
+    displayItems: entry.displayItems as unknown as Prisma.InputJsonValue,
     ...bid,
   };
 

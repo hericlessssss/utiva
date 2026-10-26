@@ -24,6 +24,15 @@ describe('AuctionsPage', () => {
     expect(screen.getAllByRole('switch').length).toBeGreaterThan(1);
   });
 
+  it('mostra o outfit do char e os itens de exibição no card', async () => {
+    renderWith({ auctions: createMockAuctions() });
+    // outfit: avatar com o nome do char no alt; aponta pro proxy de sprites.
+    const outfit = (await screen.findByAltText('Varkos Thunderhide')) as HTMLImageElement;
+    expect(outfit.src).toContain('/sprites/outfits/');
+    // itens de exibição (showcase) do card.
+    expect(screen.getAllByAltText('boots of haste').length).toBeGreaterThan(0);
+  });
+
   it('lista vazia mostra uma linha seca', async () => {
     const auctions = { ...createMockAuctions(), list: vi.fn(async () => []) };
     renderWith({ auctions });

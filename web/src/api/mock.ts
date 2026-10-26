@@ -1,8 +1,25 @@
 import type { AuctionsApi } from './auctions';
 import { ApiError } from './http';
-import type { Auction, AuctionDetail } from './types';
+import type { Auction, AuctionDetail, ItemEntry } from './types';
 
 const H = 3_600_000;
+
+// Outfit base por vocação (stem do GIF no proxy) e um showcase de itens de exibição.
+const OUTFIT: Record<string, string> = {
+  Knight: '139_3',
+  Druid: '138_3',
+  Paladin: '137_3',
+  Sorcerer: '141_3',
+  Monk: '1681_3',
+};
+function outfitFor(vocation: string): string {
+  return Object.entries(OUTFIT).find(([k]) => vocation.includes(k))?.[1] ?? '128_0';
+}
+const DISPLAY_ITEMS: ItemEntry[] = [
+  { name: 'boots of haste', count: 1, sprite: '3079' },
+  { name: 'magic plate armor', count: 1, sprite: '3366' },
+  { name: 'onyx flail', count: 1, sprite: '7421' },
+];
 
 function iso(offsetMs: number): string {
   return new Date(Date.now() + offsetMs).toISOString();
@@ -76,6 +93,8 @@ function seed(): Auction[] {
     status: endsIn > 0 ? 'active' : 'finished',
     firstSeenAt: iso(-(1874211 - auctionId) * 60_000),
     lastSeenAt: iso(-60_000),
+    outfit: outfitFor(vocation),
+    displayItems: level >= 300 ? DISPLAY_ITEMS : [], // alguns chars sem showcase (mostra o caso vazio)
     // Só o primeiro char tem detalhe (fase 2) no mock; os outros simulam "ainda não detalhado".
     ...(auctionId === 1874211 ? { attributes: sampleDetail() } : {}),
     ...(watched ? { watched: { enabled: true } } : {}),
