@@ -35,9 +35,31 @@ Estas regras são inegociáveis neste repositório. Valem para toda tarefa de c�
 
 ## Estado atual
 
-**Pré-código.** O repositório contém só `README.md` e `docs/PLANEJAMENTO.md`. Ainda não há `package.json`, scaffolding, nem comandos de build/test/run. Não invente comandos: ao criar o scaffold, preencha a seção "Comandos" conforme as ferramentas reais forem adicionadas.
+**Backend de v1 implementado** na branch `feat/bootstrap-fluxo-a` (TDD, DoD verde: 53 testes unit + 21 de integração, lint/typecheck/build). Falta o **frontend** (§2).
+
+Implementado:
+- **Fluxo A** (alerta de char novo): cron → scrape fase 1 (`url`→`http-client`→`list-parser`) → detecção **por-filtro** via `auction_match` → fila pg-boss → e-mail via Resend.
+- **Fluxo B** (lembretes de fim): toggle `watched_auction` agenda jobs 3d/1d/3h/1h/15m/5m (pg-boss `startAfter` + `retentionDays`); o worker, no disparo, só envia se ainda acompanhado e não terminado.
+- **CRUD de `watch_filter`** (`/filters`) e **toggle** (`PUT /auctions/:id/watch`).
+- Entrypoint `src/main.ts`: API Fastify + worker pg-boss + cron (node-cron) no mesmo processo, com shutdown gracioso.
+
+**Pendente:** frontend; fetch do **detalhe** do leilão (fase 2) e leitura `GET /auctions` / `/auctions/:id`; renovar `cf_clearance` via Playwright (fallback do `CloudflareBlockedError`). Itens de validação/hardening em §13 do planejamento.
 
 **`docs/PLANEJAMENTO.md` é a fonte da verdade** (documento vivo SDD). Leia-o antes de qualquer decisão de arquitetura, modelagem ou escopo — e **atualize-o** quando uma decisão mudar.
+
+## Comandos
+
+Tudo com `pnpm`, a partir da raiz do repo:
+- `pnpm dev` — sobe a app (tsx watch `src/main.ts`). Exige `.env` (veja `.env.example`: `DATABASE_URL`, `RESEND_API_KEY`, `MAIL_FROM`, `MAIL_TO`; opcionais `CF_CLEARANCE`, `SCRAPE_CRON`, `PORT`, `HOST`).
+- `pnpm test` — testes **unitários** (puros, sem banco).
+- `pnpm test:int` — testes de **integração** (exigem Postgres de pé; rodam em série).
+- `pnpm typecheck` · `pnpm lint` · `pnpm build`.
+- `pnpm db:migrate` (Prisma migrate dev) · `pnpm db:generate`.
+- `docker compose up -d db` — sobe só o Postgres (`127.0.0.1:5433`). `docker compose up --build` sobe app+db.
+
+**DoD** = `pnpm lint` + `pnpm typecheck` + `pnpm test` + `pnpm test:int` + `pnpm build`, todos verdes.
+
+**Estrutura:** `src/scraper` (`url`, `http-client`, `list-parser`, `detect`, `tick`), `src/db` (`auction-repo`), `src/queue` (`new-auction-queue`, `reminder-queue`), `src/mailer`, `src/reminders` (`thresholds`, `watch`), `src/routes` (`health`, `filters`, `watch`), `src/{app,main,config,cron,flow,env}.ts`. Schema em `prisma/schema.prisma`. Testes de integração: sufixo `*.int.test.ts` (config `vitest.int.config.ts`).
 
 ## O que é Utiva
 
