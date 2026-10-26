@@ -14,13 +14,11 @@ export async function enqueueNewForActiveFilters(
   boss: PgBoss,
   opts: FetchPageOptions = {},
 ): Promise<number> {
+  // O enqueue roda dentro do detect, ANTES de marcar o match (at-least-once). O mapa
+  // devolvido traz exatamente os chars novos por filtro — somamos pra ter o total.
+  const byFilter = await runActiveFilters(prisma, opts, (entry) => enqueueNewAuction(boss, entry));
+
   let enqueued = 0;
-
-  // O enqueue roda dentro do detect, ANTES de marcar o match (at-least-once).
-  await runActiveFilters(prisma, opts, async (entry) => {
-    await enqueueNewAuction(boss, entry);
-    enqueued++;
-  });
-
+  for (const fresh of byFilter.values()) enqueued += fresh.length;
   return enqueued;
 }
