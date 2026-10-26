@@ -32,6 +32,24 @@ describe('runFilterTick / runActiveFilters (integração)', () => {
     expect(await prisma.auctionMatch.count()).toBe(3);
   });
 
+  it('um filtro que falha não impede os outros no mesmo ciclo', async () => {
+    const failing = await prisma.watchFilter.create({ data: { world: 'Secura' } });
+    const ok = await prisma.watchFilter.create({ data: { world: 'Antica' } });
+    const fetcher: Fetcher = (url) =>
+      url.includes('Secura')
+        ? Promise.reject(new Error('boom'))
+        : Promise.resolve({ statusCode: 200, body: fixture });
+
+    const result = await runActiveFilters(prisma, {
+      fetcher,
+      sleep: () => Promise.resolve(),
+      maxRetries: 0,
+    });
+
+    expect(result.get(failing.id)).toEqual([]);
+    expect(result.get(ok.id)?.map((e) => e.auctionId)).toEqual([2292063, 2292077, 2292089]);
+  });
+
   it('runActiveFilters roda só os filtros ativos', async () => {
     await prisma.watchFilter.create({ data: { world: 'Secura', active: true } });
     await prisma.watchFilter.create({ data: { world: 'Antica', active: false } });

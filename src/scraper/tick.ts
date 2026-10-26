@@ -62,7 +62,13 @@ export async function runActiveFilters(
 
   const byFilter = new Map<number, AuctionListEntry[]>();
   for (const filter of filters) {
-    byFilter.set(filter.id, await runFilterTick(prisma, filter, opts, onNew));
+    try {
+      byFilter.set(filter.id, await runFilterTick(prisma, filter, opts, onNew));
+    } catch (err) {
+      // Um filtro que falha (403/rede) não pode impedir os outros no mesmo ciclo.
+      console.error(`[tick] filtro ${filter.id} falhou:`, err);
+      byFilter.set(filter.id, []);
+    }
   }
 
   return byFilter;
