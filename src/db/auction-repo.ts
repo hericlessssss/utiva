@@ -4,6 +4,9 @@ import type { AuctionListEntry } from '../scraper/list-parser.js';
 /**
  * Dado os IDs da página atual, devolve quais já estão persistidos — o "conjunto visto"
  * do diff (§5). Consulta só os IDs da página (não a tabela inteira, que cresce sem limite).
+ *
+ * Primitiva da fase 2: a detecção de "char novo" (fase 1) usa novidade por-filtro via
+ * auction_match; este diff global serve pra decidir de quais IDs buscar o detalhe uma vez só.
  */
 export async function listSeenAuctionIds(
   prisma: PrismaClient,
@@ -41,4 +44,20 @@ export async function upsertAuction(prisma: PrismaClient, entry: AuctionListEntr
     create: { auctionId: entry.auctionId, ...fields },
     update: { ...fields, lastSeenAt: new Date() },
   });
+}
+
+/**
+ * Registra que um watch_filter capturou um leilão (§6/§7-A). Devolve `true` só na
+ * primeira vez que este filtro vê este leilão — é o gatilho do alerta "char novo".
+ */
+export async function recordMatch(
+  prisma: PrismaClient,
+  auctionId: number,
+  watchFilterId: number,
+): Promise<boolean> {
+  const { count } = await prisma.auctionMatch.createMany({
+    data: [{ auctionId, watchFilterId }],
+    skipDuplicates: true,
+  });
+  return count > 0;
 }

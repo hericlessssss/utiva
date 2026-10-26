@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { listSeenAuctionIds, upsertAuction } from '../../src/db/auction-repo.js';
+import { listSeenAuctionIds, recordMatch, upsertAuction } from '../../src/db/auction-repo.js';
 import type { AuctionListEntry } from '../../src/scraper/list-parser.js';
 
 const prisma = new PrismaClient();
@@ -23,11 +23,13 @@ describe('auction-repo (integração)', () => {
   beforeEach(async () => {
     await prisma.auctionMatch.deleteMany();
     await prisma.auction.deleteMany();
+    await prisma.watchFilter.deleteMany();
   });
 
   afterAll(async () => {
     await prisma.auctionMatch.deleteMany();
     await prisma.auction.deleteMany();
+    await prisma.watchFilter.deleteMany();
     await prisma.$disconnect();
   });
 
@@ -48,5 +50,14 @@ describe('auction-repo (integração)', () => {
     const row = await prisma.auction.findUniqueOrThrow({ where: { auctionId: 1 } });
     expect(row.currentBid).toBe(99);
     expect(row.minBid).toBeNull();
+  });
+
+  it('recordMatch liga auction e watch_filter, devolvendo true só na primeira vez', async () => {
+    await upsertAuction(prisma, entry(2292063));
+    const filter = await prisma.watchFilter.create({ data: {} });
+
+    expect(await recordMatch(prisma, 2292063, filter.id)).toBe(true);
+    expect(await recordMatch(prisma, 2292063, filter.id)).toBe(false);
+    expect(await prisma.auctionMatch.count()).toBe(1);
   });
 });
