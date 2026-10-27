@@ -1,5 +1,6 @@
 import { NavLink, Route, Routes } from 'react-router';
 import { RequireAuth, useSession } from './auth/session';
+import { VerifyBanner } from './components/VerifyBanner';
 import { AuctionPage } from './pages/AuctionPage';
 import { AuctionsPage } from './pages/AuctionsPage';
 import { FiltersPage } from './pages/FiltersPage';
@@ -45,6 +46,7 @@ export function App() {
         </nav>
         <AuthControl />
       </header>
+      <VerifyBanner />
       <main>
         <Routes>
           <Route path="/" element={<HomePage />} />

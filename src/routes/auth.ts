@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import type { FastifyInstance, FastifyReply } from 'fastify';
+import type PgBoss from 'pg-boss';
 import type { AuthConfig } from '../config.js';
 import { exchangeCode, type FetchLike } from '../auth/google.js';
 import {
@@ -16,6 +17,8 @@ import {
   SESSION_TTL_MS,
   upsertUserByGoogle,
 } from '../db/user-repo.js';
+import { confirmEmailByToken } from '../db/email-repo.js';
+import { requestVerification } from '../queue/verification-queue.js';
 
 /** Cookie da sessão de login (token opaco). */
 export const SESSION_COOKIE = 'utiva_session';
@@ -32,12 +35,20 @@ interface OauthState {
 export interface AuthRoutesOpts {
   prisma: PrismaClient;
   auth: AuthConfig;
+  /** Fila pg-boss do e-mail de confirmação (double opt-in). Ausente = não envia confirmação. */
+  boss?: PgBoss;
   /** Injetável nos testes para não bater no Google de verdade. */
   fetchImpl?: FetchLike;
 }
 
+/** Acrescenta `?email=<status>` ao destino do redirect (confirma/invalida o e-mail na UI). */
+function withEmailParam(redirect: string, status: 'confirmed' | 'invalid'): string {
+  const sep = redirect.includes('?') ? '&' : '?';
+  return `${redirect}${sep}email=${status}`;
+}
+
 export async function authRoutes(app: FastifyInstance, opts: AuthRoutesOpts): Promise<void> {
-  const { prisma, auth, fetchImpl } = opts;
+  const { prisma, auth, boss, fetchImpl } = opts;
 
   const baseCookie = {
     httpOnly: true,
@@ -127,6 +138,13 @@ export async function authRoutes(app: FastifyInstance, opts: AuthRoutesOpts): Pr
         const user = await upsertUserByGoogle(prisma, identity);
         const { token } = await createSession(prisma, user.id);
         reply.setCookie(SESSION_COOKIE, token, { ...baseCookie, maxAge: SESSION_TTL_MS / 1000 });
+        // Double opt-in (Fase 4): se o e-mail ainda não foi confirmado, dispara a confirmação
+        // (o cooldown evita spam em logins repetidos). Não trava o login se a fila falhar.
+        if (boss) {
+          await requestVerification(prisma, boss, user).catch((err: unknown) => {
+            req.log.warn({ err }, 'falha ao enfileirar e-mail de confirmação');
+          });
+        }
         return reply.redirect(auth.postLoginRedirect);
       } catch (err) {
         // Falha transitória (código expirado, callback reaberto, erro no token endpoint): é uma
@@ -136,6 +154,35 @@ export async function authRoutes(app: FastifyInstance, opts: AuthRoutesOpts): Pr
       }
     },
   );
+
+  // Confirma o e-mail a partir do link (double opt-in). É navegação top-level: redireciona
+  // pra app com ?email=confirmed|invalid em vez de devolver JSON.
+  app.get<{ Querystring: { token?: string } }>('/auth/verify-email', async (req, reply) => {
+    const token = req.query.token;
+    const user = token ? await confirmEmailByToken(prisma, token) : null;
+    const status = user ? 'confirmed' : 'invalid';
+    return reply.redirect(withEmailParam(auth.postLoginRedirect, status));
+  });
+
+  // Reenvia o e-mail de confirmação (exige login). Respeita o cooldown de reenvio.
+  app.post('/auth/resend-verification', async (req, reply) => {
+    const token = req.cookies[SESSION_COOKIE];
+    const user = token ? await findUserBySession(prisma, token) : null;
+    if (!user) return reply.code(401).send({ error: 'não autenticado' });
+    if (!boss) return reply.code(503).send({ error: 'confirmação indisponível' });
+
+    try {
+      const result = await requestVerification(prisma, boss, user);
+      if (result === 'confirmed') return reply.code(200).send({ status: 'confirmed' });
+      if (result === 'throttled') return reply.code(429).send({ status: 'throttled' });
+      return reply.code(202).send({ status: 'sent' });
+    } catch (err) {
+      // Falha ao enfileirar a confirmação (fila indisponível). O token foi desfeito, então
+      // o usuário pode tentar de novo. Responde 503 em vez de deixar virar 500.
+      req.log.warn({ err }, 'falha ao reenviar e-mail de confirmação');
+      return reply.code(503).send({ error: 'confirmação indisponível' });
+    }
+  });
 
   // Encerra a sessão: apaga do banco e limpa o cookie. Idempotente.
   app.post('/auth/logout', async (req, reply) => {
@@ -150,6 +197,12 @@ export async function authRoutes(app: FastifyInstance, opts: AuthRoutesOpts): Pr
     const token = req.cookies[SESSION_COOKIE];
     const user = token ? await findUserBySession(prisma, token) : null;
     if (!user) return reply.code(401).send({ error: 'não autenticado' });
-    return { id: user.id, email: user.email, name: user.name, picture: user.picture };
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      picture: user.picture,
+      emailVerified: user.emailOptInAt != null,
+    };
   });
 }

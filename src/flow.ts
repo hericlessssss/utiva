@@ -18,11 +18,11 @@ export async function enqueueNewForActiveFilters(
 ): Promise<number> {
   // O enqueue roda dentro do detect, ANTES de marcar o match (at-least-once). O mapa
   // devolvido traz exatamente os chars novos por filtro — somamos pra ter o total. O alerta
-  // vai pro e-mail do dono do filtro (fluxo por usuário).
+  // vai pro dono do filtro; o e-mail é resolvido do banco no envio (fluxo por usuário).
   const byFilter = await runActiveFilters(
     prisma,
     opts,
-    (entry, filter) => enqueueNewAuction(boss, entry, { userId: filter.userId, to: filter.user.email }),
+    (entry, filter) => enqueueNewAuction(boss, entry, { userId: filter.userId }),
     fetchPageFn,
   );
 

@@ -116,12 +116,22 @@ export function validateIdClaims(
   };
 }
 
+/** SHA-256 (hex) de um valor — usado pra guardar só o hash de tokens opacos no banco. */
+export function sha256Hex(value: string): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+/** Token opaco aleatório (cru) — vai pro cookie/link; no banco guardamos só o hash. */
+export function randomToken(): string {
+  return base64url(randomBytes(32));
+}
+
 /** SHA-256 (hex) de um token de sessão — o que vai pro banco (ver model Session). */
 export function hashSessionToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
+  return sha256Hex(token);
 }
 
 /** Gera um token de sessão opaco (cru, vai pro cookie). */
 export function generateSessionToken(): string {
-  return base64url(randomBytes(32));
+  return randomToken();
 }

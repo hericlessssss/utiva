@@ -167,7 +167,7 @@ A partir de out/2026 o Utiva deixa de ser single-user local: amigos vão usar, e
 - **Sessão em tabela própria** (`session`), com cookie `httpOnly` `SameSite=Lax`. A PK é o SHA-256 do token; o cookie carrega o token cru. `Secure` liga sozinho quando o `redirect_uri` é https.
 - **Auth é opcional por config:** sem `GOOGLE_CLIENT_ID`, as rotas `/auth/*` não sobem (dev sem OAuth, e testes que não precisam dele).
 
-**Fases:** 0 home pública ✅ · 1 landing ✅ · **2 backend de auth ✅** (user + OIDC + sessão: `/auth/google`, `/auth/callback`, `/auth/logout`, `/auth/me`) · **3 dados por usuário ✅** (`user_id` em `watch_filter`/`watched_auction`; rotas escopadas; fluxos A/B por dono; `/filtros` e watch atrás de login) · **4 e-mail por usuário** (destinatário ✅ nos fluxos A/B; falta double opt-in/verificação) · **5 UX de login no frontend ✅** (tela `/entrar`, topbar logado/deslogado, logout; `SessionProvider`; `RequireAuth` em `/filtros`) · 6 deploy GCP + HTTPS (adicionar o `redirect_uri` de produção no Console).
+**Fases:** 0 home pública ✅ · 1 landing ✅ · **2 backend de auth ✅** (user + OIDC + sessão: `/auth/google`, `/auth/callback`, `/auth/logout`, `/auth/me`) · **3 dados por usuário ✅** (`user_id` em `watch_filter`/`watched_auction`; rotas escopadas; fluxos A/B por dono; `/filtros` e watch atrás de login) · **4 e-mail por usuário ✅** (destinatário nos fluxos A/B; double opt-in + rate-limit — detalhe abaixo) · **5 UX de login no frontend ✅** (tela `/entrar`, topbar logado/deslogado, logout; `SessionProvider`; `RequireAuth` em `/filtros`) · 6 deploy GCP + HTTPS (adicionar o `redirect_uri` de produção no Console).
 
 **Frontend (Fase 5):** `web/src/api/auth.ts` (`me`→null em 401, `logout`, `loginUrl`), `web/src/auth/session.tsx` (`SessionProvider`+`useSession`), `web/src/pages/LoginPage.tsx` (`/entrar`; já logado → redirect pra `/`). O login é um **link top-level** pro backend (`<a href={loginUrl}>`), não fetch. **Dev:** o cookie de sessão só fecha o ciclo em same-origin (a API servindo `web/dist` na :3000); pelo Vite :5173 com proxy `/api` o cookie de :3000 não volta — testar login real só na :3000.
 
@@ -177,7 +177,7 @@ A partir de out/2026 o Utiva deixa de ser single-user local: amigos vão usar, e
 - `POST /auth/logout` → apaga a sessão e limpa o cookie (204, idempotente).
 - `GET /auth/me` → identidade da sessão (200) ou 401.
 
-**Modelo (adições ao §6):** `user` (`id` uuid, `google_sub` único, email, name, picture) e `session` (`id` = hash do token, `user_id`, `expires_at`).
+**Modelo (adições ao §6):** `user` (`id` uuid, `google_sub` único, email, name, picture, `email_opt_in_at` nulo — Fase 4) e `session` (`id` = hash do token, `user_id`, `expires_at`). Fase 4 acrescenta `email_verification` (`id` = hash do token, `user_id`, `email`, `expires_at`) e `email_event` (`user_id`, `type`, `created_at`).
 
 **Fase 3 — dados por usuário (decisões 27/out):**
 - **`user_id` em `watch_filter` e `watched_auction`** (FK → `user`, `onDelete: Cascade`, NOT NULL). `watched_auction` deixa de ter PK `auction_id` → PK composta **`(user_id, auction_id)`** (vários usuários acompanham o mesmo leilão). `auction_match` segue por filtro (já é por usuário transitivamente). `notification` não existe como tabela (lembretes são jobs pg-boss) → nada a migrar lá.
@@ -185,6 +185,21 @@ A partir de out/2026 o Utiva deixa de ser single-user local: amigos vão usar, e
 - **Login obrigatório nas rotas de dados** (sem bypass em dev): preHandler `requireUser` → 401 sem sessão, em `/filters` (CRUD escopado ao dono) e `PUT /auctions/:id/watch`. `GET /auctions`/`:id` ficam **públicos** (home é pública) via `optionalUser` — o campo `watched` reflete o usuário logado, ou `null` anônimo.
 - **E-mail pro dono:** o fluxo A carrega `user_id`+e-mail do dono do filtro no job; o fluxo B idem no job de lembrete; os workers enviam pro e-mail do usuário (puxa a parte de destinatário da Fase 4). O `MAIL_TO` global vira só fallback.
 - **Frontend:** `/filtros` e o toggle de acompanhar exigem login (sem sessão → manda pra `/entrar`).
+
+**Fase 4 — double opt-in + rate-limit (decisões 27/out):**
+
+Como o cadastro é aberto (qualquer conta Google entra), dois controles protegem o custo do Resend e o endereço de quem recebe:
+
+- **Double opt-in (consentimento):** o usuário só recebe alerta/lembrete depois de **clicar no link de confirmação**. O Google já verifica o e-mail no login (`email_verified`), mas confirmar de novo prova que a pessoa controla a caixa e quer os e-mails — e quem só loga e some custa **zero** envio.
+  - **Estado:** `user.email_opt_in_at` (`null` = pendente). Setado ao confirmar; **resetado pra `null`** quando o e-mail da conta Google muda (upsert compara o e-mail antigo).
+  - **Token:** tabela `email_verification` (PK = SHA-256 hex do token cru, como a `session`; guarda `user_id`, `email` que confirma e `expires_at`), TTL **24h**. O envio no login e o reenvio são throttled por um **cooldown de 5 min** (olha o `created_at` do último token do usuário) — logins repetidos não spammam.
+  - **Gatilho:** enviado **automático no 1º login** (e quando o e-mail muda). `POST /auth/resend-verification` (exige login) reenvia respeitando o cooldown. O e-mail de confirmação sai por uma fila pg-boss própria (`email-verification`), com o link montado a partir da origem do `redirect_uri`.
+  - **Verificação:** `GET /auth/verify-email?token=` valida o token (existe, não expirou, `email` ainda bate com o do usuário), seta `email_opt_in_at` e redireciona pra app (`?email=confirmed`); token inválido/expirado → `?email=invalid` (navegação top-level, não JSON de erro).
+- **Rate-limit (custo):** teto de **50 e-mails de alerta/lembrete por usuário por janela deslizante de 24h**. Ao estourar: o alerta excedente é **dropado + logado** (é limite anti-abuso, não garantia de entrega) e o usuário recebe **um** aviso "limite atingido" por janela.
+  - **Registro:** tabela `email_event` (`user_id`, `type` `alert`|`limit`, `created_at`; índice `(user_id, created_at)`). A contagem olha os `alert` na janela; o aviso de limite é deduplicado por `type=limit` na mesma janela. Confirmação e aviso de limite **não contam** no teto (são transacionais).
+- **Chokepoint único:** os dois workers (fluxo A `new-auction-email` e fluxo B `auction-end-reminder`) entregam via `deliverToUser(deps, userId, content)` — resolve o usuário (pega mudança de e-mail), exige opt-in e aplica o rate-limit. Fora dele ninguém manda alerta.
+- **Frontend:** `GET /auth/me` passa a devolver `emailVerified` (bool). Logado e pendente → um banner "confirme seu e-mail" com botão de reenviar (`VerifyBanner`). `?email=confirmed|invalid` vira um aviso curto no topo.
+- **Constantes** (`src/mailer/user-mailer.ts`): `EMAIL_DAILY_CAP=50`, `EMAIL_WINDOW_MS=24h`; injetáveis nos testes. Promover a env só se precisar afinar em produção (YAGNI agora).
 
 ---
 

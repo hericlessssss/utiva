@@ -8,12 +8,12 @@ import { createMockAuctions } from '../api/mock';
 import { SessionProvider } from '../auth/session';
 import { AuctionsPage } from './AuctionsPage';
 
-const USER: SessionUser = { id: 'u1', email: 'a@b.com', name: 'A', picture: null };
+const USER: SessionUser = { id: 'u1', email: 'a@b.com', name: 'A', picture: null, emailVerified: true };
 
 function renderWith(api: Partial<Api>, user: SessionUser | null = USER) {
   const full = {
     ...api,
-    auth: { me: vi.fn(async () => user), logout: vi.fn(), loginUrl: () => '/auth/google' },
+    auth: { me: vi.fn(async () => user), logout: vi.fn(), resendVerification: vi.fn(), loginUrl: () => '/auth/google' },
   } as unknown as Api;
   return render(
     <ApiContext.Provider value={full}>

@@ -9,7 +9,7 @@ import { LoginPage } from './LoginPage';
 
 function renderWith(user: SessionUser | null, loginUrl = 'http://127.0.0.1:3000/auth/google') {
   const api = {
-    auth: { me: vi.fn(async () => user), logout: vi.fn(), loginUrl: () => loginUrl },
+    auth: { me: vi.fn(async () => user), logout: vi.fn(), resendVerification: vi.fn(), loginUrl: () => loginUrl },
   };
   return render(
     <ApiContext.Provider value={api as unknown as Api}>
@@ -25,7 +25,7 @@ function renderWith(user: SessionUser | null, loginUrl = 'http://127.0.0.1:3000/
   );
 }
 
-const user: SessionUser = { id: 'u1', email: 'jogador@gmail.com', name: 'Jogador', picture: null };
+const user: SessionUser = { id: 'u1', email: 'jogador@gmail.com', name: 'Jogador', picture: null, emailVerified: true };
 
 describe('LoginPage', () => {
   it('deslogado: mostra o link de login do Google com o href do backend', async () => {

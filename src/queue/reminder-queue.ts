@@ -1,6 +1,6 @@
-import type { PrismaClient } from '@prisma/client';
 import type PgBoss from 'pg-boss';
-import { sendReminderAlert, type MailerConfig } from '../mailer/mailer.js';
+import { buildReminderEmail } from '../mailer/reminder-email.js';
+import { deliverToUser, type DeliverDeps } from '../mailer/user-mailer.js';
 import { reminderSchedule } from '../reminders/thresholds.js';
 
 export const REMINDER_QUEUE = 'auction-end-reminder';
@@ -52,14 +52,13 @@ export async function scheduleReminders(
   return scheduled;
 }
 
-export interface ReminderWorkerDeps {
-  prisma: PrismaClient;
-  mailer: MailerConfig;
-}
+/** Deps do worker = deps do `deliverToUser` (prisma + mailer, com cap/janela injetáveis). */
+export type ReminderWorkerDeps = DeliverDeps;
 
 /**
  * Worker dos lembretes. No disparo, só envia se o leilão ainda está acompanhado (enabled)
- * e não terminou — é o que substitui o "cancelar jobs" ao desligar o toggle (§7-B).
+ * e não terminou — é o que substitui o "cancelar jobs" ao desligar o toggle (§7-B). A entrega
+ * passa pelo `deliverToUser` (gate de opt-in + rate-limit, Fase 4).
  * Assume batchSize=1 (default): 1 job por batch, então um erro re-tenta só esse job. Se
  * batchSize for aumentado, isolar cada job (try/catch) pra não re-enviar os já entregues.
  */
@@ -78,16 +77,15 @@ export async function registerReminderWorker(boss: PgBoss, deps: ReminderWorkerD
       if (!auction) continue;
       if (auction.endAt.getTime() <= Date.now()) continue; // já terminou
 
-      // ...e manda pro e-mail do próprio usuário (resolvido no disparo: pega mudança de e-mail).
-      const user = await deps.prisma.user.findUnique({ where: { id: userId } });
-      if (!user) continue;
-
-      await sendReminderAlert(
-        deps.mailer,
-        { auctionId, charName: auction.charName, endAt: auction.endAt },
-        label,
-        user.email,
+      // ...e entrega pro dono (resolve e-mail + aplica opt-in/rate-limit no `deliverToUser`).
+      const result = await deliverToUser(
+        deps,
+        userId,
+        buildReminderEmail({ auctionId, charName: auction.charName, endAt: auction.endAt }, label),
       );
+      if (result === 'rate-limited') {
+        console.warn(`[reminder] usuário ${userId} no teto de e-mails — lembrete dropado`);
+      }
     }
   });
 }

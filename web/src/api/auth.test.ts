@@ -44,6 +44,12 @@ describe('authApi', () => {
     expect(send).toHaveBeenCalledWith('POST', '/auth/logout');
   });
 
+  it('resendVerification faz POST /auth/resend-verification', async () => {
+    const send = vi.fn(async () => undefined);
+    await createAuthApi(http({ send }), '').resendVerification();
+    expect(send).toHaveBeenCalledWith('POST', '/auth/resend-verification');
+  });
+
   it('loginUrl monta a URL a partir do baseUrl', () => {
     expect(createAuthApi(http({}), 'http://127.0.0.1:3000').loginUrl()).toBe(
       'http://127.0.0.1:3000/auth/google',

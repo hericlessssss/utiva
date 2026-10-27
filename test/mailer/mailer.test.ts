@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { sendNewAuctionAlert, type EmailMessage } from '../../src/mailer/mailer.js';
+import { sendEmail, type EmailMessage } from '../../src/mailer/mailer.js';
 import { buildNewAuctionEmail } from '../../src/mailer/new-auction-email.js';
 import type { AuctionListEntry } from '../../src/scraper/list-parser.js';
 
@@ -33,19 +33,31 @@ describe('buildNewAuctionEmail', () => {
   });
 });
 
-describe('sendNewAuctionAlert', () => {
-  it('envia pelo transport com from/to configurados', async () => {
+describe('sendEmail', () => {
+  it('envia pelo transport com from e o destinatário global (cfg.to)', async () => {
     const sent: EmailMessage[] = [];
     const transport = vi.fn((msg: EmailMessage) => {
       sent.push(msg);
       return Promise.resolve();
     });
 
-    await sendNewAuctionAlert({ transport, from: 'a@x', to: 'b@y' }, entry);
+    await sendEmail({ transport, from: 'a@x', to: 'b@y' }, buildNewAuctionEmail(entry));
 
     expect(sent).toHaveLength(1);
     expect(sent[0]!.from).toBe('a@x');
     expect(sent[0]!.to).toBe('b@y');
     expect(sent[0]!.subject).toContain('Kord Di');
+  });
+
+  it('`to` explícito sobrepõe o cfg.to (envio por usuário)', async () => {
+    const sent: EmailMessage[] = [];
+    const transport = vi.fn((msg: EmailMessage) => {
+      sent.push(msg);
+      return Promise.resolve();
+    });
+
+    await sendEmail({ transport, from: 'a@x', to: 'fallback@y' }, buildNewAuctionEmail(entry), 'dono@z');
+
+    expect(sent[0]!.to).toBe('dono@z');
   });
 });

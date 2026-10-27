@@ -13,6 +13,7 @@ import { createSpriteStore } from './sprites/sprite-store.js';
 import { buildListUrl } from './scraper/url.js';
 import { ensureQueues, registerNewAuctionWorker } from './queue/new-auction-queue.js';
 import { ensureReminderQueue, registerReminderWorker } from './queue/reminder-queue.js';
+import { ensureVerificationQueue, registerVerificationWorker } from './queue/verification-queue.js';
 
 /**
  * Entrypoint do monólito (§3 ADR 8): sobe API (Fastify) + fila/worker (pg-boss) +
@@ -33,8 +34,16 @@ async function main(): Promise<void> {
   await boss.start();
   await ensureQueues(boss);
   await ensureReminderQueue(boss);
-  await registerNewAuctionWorker(boss, mailer);
+  await registerNewAuctionWorker(boss, { prisma, mailer });
   await registerReminderWorker(boss, { prisma, mailer });
+
+  // Double opt-in (Fase 4): a fila de confirmação só sobe com auth configurado — o link de
+  // confirmação aponta pra mesma origem do redirect_uri do OAuth (`/auth/verify-email`).
+  if (cfg.auth) {
+    await ensureVerificationQueue(boss);
+    const baseUrl = new URL(cfg.auth.redirectUri).origin;
+    await registerVerificationWorker(boss, { mailer, baseUrl });
+  }
 
   // Sessão do cf_clearance: reusa o cookie (env ou arquivo) e, no bloqueio persistente do
   // Cloudflare, renova via Playwright e persiste o cookie novo (§3/§5). O `session.fetchPage`
