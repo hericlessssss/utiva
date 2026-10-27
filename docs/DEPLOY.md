@@ -1,30 +1,25 @@
-# Deploy (Fase 6) — VPS Hostinger + HTTPS + CI/CD
+# Deploy (Fase 6) — VPS Hostinger (Kamal) + CI/CD
 
-Produção: **1 VPS Hostinger (Ubuntu)**, HTTPS via **Caddy + Let's Encrypt** sobre **sslip.io** (ou um domínio), deploy por **GitHub Actions** (build no runner → GHCR → SSH no VPS). Secrets no **GitHub Secrets**.
+Produção: **1 VPS Hostinger (Ubuntu)** que já roda **Kamal** — o container compartilhado **`kamal-proxy`** ocupa 80/443 e faz o TLS (Let's Encrypt) de várias apps. O Utiva **não sobe proxy próprio**: entra como mais uma rota no `kamal-proxy`. Deploy por **GitHub Actions** (build no runner → GHCR → SSH no VPS). Secrets no **GitHub Secrets**.
 
 ```
 push main → Actions: build → ghcr.io/hericlessssss/utiva:<sha> → SSH no VPS
-VPS: caddy (:80/:443) → app (:3000 interno) → db (postgres)
+VPS: kamal-proxy (:80/:443, compartilhado) --(rede kamal)--> utiva-app-1:3000
+     + utiva-db-1 (postgres, só na rede interna)
      app no boot: prisma migrate deploy && node dist/main.js
+     deploy registra a rota:  kamal-proxy deploy utiva --host <SITE_ADDRESS> --target utiva-app-1:3000 --tls
 ```
 
 ## Pré-requisitos (você faz)
 
-1. **VPS na Hostinger** — qualquer plano KVM serve (o de entrada já basta; Postgres+Node+Caddy cabem em 2–4GB). SO: **Ubuntu 24.04** (ou o template **"Ubuntu 24.04 com Docker"**, que pula a instalação do Docker). Anote o **IP público** (é fixo/dedicado).
-2. **Chave SSH** — adicione a chave pública de deploy (gerada no repo, veja abaixo) à VPS: no painel Hostinger → VPS → *SSH Keys* (ou escolha-a na criação). A privada vai pro GitHub Secret `VM_SSH_KEY`.
-3. **Resend precisa de domínio** — pra `MAIL_FROM` enviar a terceiros, o Resend exige um **domínio verificado (SPF/DKIM)**. sslip.io não resolve isso. **Como você já está na Hostinger, pegar um domínio barato lá resolve tudo de uma vez**: aponta o A record pro IP da VPS (vira o site, no lugar do sslip.io) e verifica no Resend via o DNS da Hostinger. Sem domínio, o e-mail só chega no seu próprio endereço de teste.
-4. **Google Console** — adicionar `https://<SITE_ADDRESS>/auth/callback` nos Authorized redirect URIs do OAuth Client (`<SITE_ADDRESS>` = `<IP>.sslip.io` ou seu domínio).
+1. **VPS Hostinger com Docker + Kamal** (já existe). O `kamal-proxy` já cuida de 80/443 e TLS — não precisa abrir/gerenciar portas pro Utiva.
+2. **Chave SSH** — a pública de deploy já está na VPS (user `root`); a privada está no GitHub Secret `VM_SSH_KEY`.
+3. **Resend precisa de domínio** — pra `MAIL_FROM` enviar a terceiros, o Resend exige um **domínio verificado (SPF/DKIM)**. Com sslip.io o e-mail só chega no seu próprio endereço de teste. (Futuro: domínio na Hostinger resolve site + e-mail.)
+4. **Google Console** — `https://<SITE_ADDRESS>/auth/callback` nos Authorized redirect URIs do OAuth Client (`<SITE_ADDRESS>` = `<IP>.sslip.io` ou domínio).
 
-## Provisionamento (uma vez, na VPS)
+## Provisionamento (uma vez, já feito)
 
-Com a VPS no ar, rode **como root** (via SSH ou o terminal do navegador da Hostinger):
-
-```bash
-# pega o provision.sh do repo e executa (instala Docker+compose se faltar, swap 2GB, /opt/utiva)
-curl -fsSL https://raw.githubusercontent.com/hericlessssss/utiva/main/infra/provision.sh | bash
-```
-
-> O `provision.sh` está no repo em `infra/provision.sh`. Se preferir, copie e cole o conteúdo. É idempotente — pode rodar de novo sem quebrar.
+`infra/provision.sh` roda como root na VPS (Docker+compose se faltar, swap 2GB, `/opt/utiva`). Idempotente.
 
 ## GitHub Secrets (Settings → Secrets and variables → Actions)
 
@@ -32,42 +27,44 @@ curl -fsSL https://raw.githubusercontent.com/hericlessssss/utiva/main/infra/prov
 |---|---|
 | `VM_HOST` | IP público da VPS |
 | `VM_USER` | `root` |
-| `VM_SSH_KEY` | conteúdo da **chave privada** de deploy |
-| `SITE_ADDRESS` | `<IP>.sslip.io` (hífens no IP, ex.: `203-0-113-5.sslip.io`) **ou** seu domínio |
-| `POSTGRES_PASSWORD` | senha forte do Postgres |
-| `RESEND_API_KEY` / `MAIL_FROM` / `MAIL_TO` | credenciais do Resend |
+| `VM_SSH_KEY` | chave **privada** de deploy |
+| `SITE_ADDRESS` | `<IP>.sslip.io` (hífens no IP, ex.: `2-24-100-80.sslip.io`) **ou** domínio — vira o `--host` do kamal-proxy |
+| `POSTGRES_PASSWORD` | senha do Postgres |
+| `RESEND_API_KEY` / `MAIL_FROM` / `MAIL_TO` | Resend |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth Client |
 | `OAUTH_REDIRECT_URI` | `https://<SITE_ADDRESS>/auth/callback` |
 | `COOKIE_SECRET` | `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 
-GHCR usa o `GITHUB_TOKEN` do próprio workflow — sem secret extra. (A imagem `ghcr.io/hericlessssss/utiva` precisa ser acessível; o deploy faz `docker login ghcr.io` com o token efêmero do Actions.)
+GHCR usa o `GITHUB_TOKEN` do próprio workflow.
 
 ## Deploy
 
-- **Automático:** push na `main` → o workflow `deploy.yml` builda, publica no GHCR e sobe na VPS.
+- **Automático:** push na `main` → `deploy.yml` builda, publica no GHCR, sobe o compose na VPS e **registra a rota no kamal-proxy**.
 - **Manual:** aba Actions → `deploy` → *Run workflow*.
-- **Rollback:** na VPS, `cd /opt/utiva && IMAGE_TAG=<sha-anterior> docker compose -f docker-compose.prod.yml up -d` (tags por SHA ficam no GHCR).
+- **Rollback:** na VPS, `cd /opt/utiva && IMAGE_TAG=<sha-anterior> docker compose -f docker-compose.prod.yml up -d` + re-registrar (`docker exec kamal-proxy kamal-proxy deploy utiva --host <SITE_ADDRESS> --target utiva-app-1:3000 --health-check-path /health --tls`).
 
 ## Verificação pós-deploy
 
 ```bash
-curl -I https://<SITE_ADDRESS>/health      # 200, TLS válido (Let's Encrypt)
-# browser: home carrega, cadeado ok, login Google → e-mail de confirmação chega
+curl -I https://<SITE_ADDRESS>/health            # 200, TLS válido
+docker exec kamal-proxy kamal-proxy list         # a rota `utiva` deve aparecer running/tls yes
 ssh root@<IP> 'cd /opt/utiva && docker compose -f docker-compose.prod.yml logs --tail=50 app'
 ```
 
 ## Operação
 
 - **Logs:** `docker compose -f docker-compose.prod.yml logs -f app`.
-- **Backup do Postgres (recomendado via cron na VPS):**
+- **Backup do Postgres (cron na VPS):**
   ```bash
   docker compose -f docker-compose.prod.yml exec -T db pg_dump -U utiva utiva | gzip > ~/utiva-$(date +%F).sql.gz
   ```
-- **Firewall:** garanta no painel da Hostinger (e/ou `ufw`) que **22, 80 e 443** estão abertas. O padrão da Hostinger já deixa abertas.
-- **Cert:** não apague o volume `caddy_data` à toa — o Let's Encrypt tem rate limit.
+- **Remover a rota (se precisar tirar do ar):** `docker exec kamal-proxy kamal-proxy remove utiva` (não afeta as outras apps).
+- **Nunca** bindar 80/443 no compose do Utiva — são do `kamal-proxy` compartilhado.
 
 ## Notas
 
-- **RAM:** swap de 2GB é criado pelo `provision.sh` como colchão.
-- **Playwright/Chromium** não está na imagem (fallback de `cf_clearance`); hoje o HTTP puro passa. Tratar se o Cloudflare desafiar em prod.
-- **sslip.io → domínio depois:** mudar `SITE_ADDRESS` + `OAUTH_REDIRECT_URI` (e o redirect no Console) e apontar o A record pro IP. Sem mudança de código.
+- **TLS/cert** são gerenciados pelo `kamal-proxy` (não temos volume de certs próprio).
+- **Rede `kamal`**: o `utiva-app` precisa estar nela pro proxy alcançá-lo (`networks: [default, kamal]` no compose; `kamal` é `external`).
+- **Health check** do kamal-proxy aponta pra `/health` (o default dele é `/up`).
+- **Playwright/Chromium** não está na imagem (fallback de `cf_clearance`); hoje o HTTP puro passa.
+- **sslip.io → domínio depois:** mudar `SITE_ADDRESS` + `OAUTH_REDIRECT_URI` (e o redirect no Console); o deploy re-registra a rota com o novo host.
