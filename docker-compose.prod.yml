@@ -10,8 +10,11 @@ services:
   app:
     image: ghcr.io/hericlessssss/utiva:${IMAGE_TAG:-latest}
     restart: unless-stopped
-    # Aplica as migrations antes de subir (volume limpo não tem as tabelas).
-    command: sh -c "node_modules/.bin/prisma migrate deploy && node dist/main.js"
+    # Migrations antes de subir (volume limpo não tem as tabelas). Depois sobe um Xvfb (display
+    # virtual :99) e roda o app com DISPLAY=:99: o scraper abre o Chromium HEADFUL (headless não
+    # passa no managed challenge do Cloudflare), e headful no Linux precisa de um display. (Xvfb
+    # manual em vez de xvfb-run, que trava rodando como usuário não-root.)
+    command: sh -c "node_modules/.bin/prisma migrate deploy && (Xvfb :99 -screen 0 1366x768x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &) && DISPLAY=:99 node dist/main.js"
     depends_on:
       db:
         condition: service_healthy

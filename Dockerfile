@@ -39,9 +39,10 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 # openssl: o Prisma precisa dele em runtime (sem, loga warning e pode errar o query engine).
 # chromium: o renovador do cf_clearance (Playwright) só roda com o browser instalado; sem ele,
 # todo tick morre com CfRenewalError e o bazar nunca popula. `--with-deps` traz as libs do SO.
-RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates xvfb xauth \
   && node_modules/.bin/playwright install --with-deps chromium \
   && chmod -R a+rx /ms-playwright \
+  && mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix \
   && rm -rf /var/lib/apt/lists/*
 # Regera o Prisma Client AQUI, com o openssl 3.x ja instalado, pro query engine bater com o
 # target do SO (debian-openssl-3.0.x). Gerado no stage `deps` (node:slim, sem openssl) saía só
