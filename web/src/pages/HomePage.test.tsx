@@ -56,6 +56,14 @@ describe('HomePage', () => {
     expect(detailLinks()).toHaveLength(5); // completa com os próximos ativos
   });
 
+  it('traz o descritivo: como funciona e como ativar o e-mail', async () => {
+    renderWith({ auctions: createMockAuctions() });
+    await screen.findByRole('heading', { level: 1 });
+    expect(screen.getByRole('heading', { name: 'Como funciona' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Ativar os alertas por e-mail' })).toBeTruthy();
+    expect(screen.getByText('Entre com o Google')).toBeTruthy();
+  });
+
   it('erro da API aparece na tela', async () => {
     const auctions = {
       ...createMockAuctions(),

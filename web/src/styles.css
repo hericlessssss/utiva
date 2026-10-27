@@ -1002,6 +1002,57 @@ button.danger {
   text-align: right;
 }
 
+.home-about {
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+
+.steps {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.step {
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--gold);
+  color: var(--bg);
+  font: 16px/1 var(--font-num);
+  font-weight: 700;
+}
+
+.step h3 {
+  margin: 12px 0 6px;
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.step p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.home-note {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
 @media (max-width: 640px) {
   .hero-title {
     font-size: 30px;
@@ -1009,5 +1060,9 @@ button.danger {
 
   .home-card-end {
     align-self: center;
+  }
+
+  .steps {
+    grid-template-columns: 1fr;
   }
 }

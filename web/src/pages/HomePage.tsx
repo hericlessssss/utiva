@@ -98,6 +98,49 @@ export function HomePage() {
           ))}
         </ul>
       </section>
+
+      <section className="home-about">
+        <h2 className="section-label">Como funciona</h2>
+        <ol className="steps">
+          <li className="step">
+            <span className="step-num">1</span>
+            <h3>Monte seus filtros</h3>
+            <p>Mundo, vocação, level, skills — os mesmos campos do Char Bazaar. Pode ter quantos quiser.</p>
+          </li>
+          <li className="step">
+            <span className="step-num">2</span>
+            <h3>A Utiva vigia o leilão</h3>
+            <p>A cada poucos minutos ela varre a lista do Bazaar e cruza cada char novo com os seus filtros.</p>
+          </li>
+          <li className="step">
+            <span className="step-num">3</span>
+            <h3>Você é avisado</h3>
+            <p>Deu match, cai um e-mail na hora. E quando um leilão que você acompanha está acabando, chega lembrete.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section className="home-about">
+        <h2 className="section-label">Ativar os alertas por e-mail</h2>
+        <ol className="steps">
+          <li className="step">
+            <span className="step-num">1</span>
+            <h3>Entre com o Google</h3>
+            <p>Usa o e-mail da sua conta Google — sem senha nova pra criar nem lembrar.</p>
+          </li>
+          <li className="step">
+            <span className="step-num">2</span>
+            <h3>Crie filtros e acompanhe leilões</h3>
+            <p>Defina o que você caça e marque os leilões que quer seguir até o fim.</p>
+          </li>
+          <li className="step">
+            <span className="step-num">3</span>
+            <h3>Confirme o e-mail</h3>
+            <p>A gente manda um link de confirmação uma vez. Clicou, os alertas começam a chegar.</p>
+          </li>
+        </ol>
+        <p className="home-note">Login com Google está sendo montado e chega na próxima atualização.</p>
+      </section>
     </div>
   );
 }
