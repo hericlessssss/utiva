@@ -128,7 +128,7 @@ export function AuctionsPage() {
                         <Sprite
                           category="outfits"
                           item={{ name: a.charName, count: 1, sprite: a.outfit }}
-                          size="sm"
+                          size="outfit"
                           hideOnError
                         />
                       )}

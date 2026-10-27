@@ -596,7 +596,7 @@ button.danger {
   image-rendering: pixelated; /* sprites são pixel art: não borrar ao escalar */
 }
 
-/* Célula menor para os cards da lista de leilões. */
+/* Célula menor para os itens de destaque dos cards da lista. */
 .icon-cell--sm {
   width: 30px;
   height: 30px;
@@ -605,6 +605,19 @@ button.danger {
 .icon-cell--sm .sprite {
   max-width: 26px;
   max-height: 26px;
+}
+
+/* Box do outfit na lista: largo e estica na altura de toda a célula do char. */
+.icon-cell--outfit {
+  width: 64px;
+  height: auto;
+  min-height: 64px;
+  align-self: stretch;
+}
+
+.icon-cell--outfit .sprite {
+  max-width: 56px;
+  max-height: 88px;
 }
 
 /* Fallback de texto quando não há sprite (ou a imagem falha): célula vira chip largo. */
@@ -620,23 +633,24 @@ button.danger {
   font-size: 11px;
 }
 
-/* Card da lista: outfit (avatar) + nome + tira de itens de exibição. */
+/* Card da lista: outfit (box grande, cobre a altura da célula) + nome + grade de itens. */
 .char-cell {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: stretch;
+  gap: 10px;
 }
 
 .char-cell-main {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
 }
 
+/* Itens de destaque em grade 2×2: dois acima, dois abaixo. */
 .char-items {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
   gap: 3px;
 }
 
