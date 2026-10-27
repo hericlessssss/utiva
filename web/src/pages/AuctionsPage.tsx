@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { useApi } from '../api/context';
+import { useSession } from '../auth/session';
 import type { Auction } from '../api/types';
 import { Sprite } from '../components/Sprite';
 import { Switch } from '../components/Switch';
@@ -25,6 +26,8 @@ export function AuctionsPage() {
   const load = useCallback(() => api.auctions.list(), [api]);
   const { data, error, loading, setData } = useLoad(load);
   const now = useNow();
+  const { user } = useSession();
+  const navigate = useNavigate();
 
   const [sort, setSort] = useState<SortKey>('recent');
   const [filter, setFilter] = useState<ListFilter>({ world: '', vocation: '', watchedOnly: false });
@@ -39,6 +42,7 @@ export function AuctionsPage() {
   );
 
   async function toggle(auction: Auction, enabled: boolean) {
+    if (!user) return navigate('/entrar'); // acompanhar exige login
     setBusy(auction.auctionId);
     setToggleError(null);
     try {

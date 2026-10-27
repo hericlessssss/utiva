@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { useApi } from '../api/context';
+import { useSession } from '../auth/session';
 import { AUCTION_DETAIL_URL, type AuctionDetail, type ItemEntry, type SpriteCategory } from '../api/types';
 import { Coin } from '../components/Coin';
 import { Sprite } from '../components/Sprite';
@@ -22,10 +23,13 @@ export function AuctionPage() {
   const load = useCallback(() => api.auctions.detail(auctionId), [api, auctionId]);
   const { data, error, loading, setData } = useLoad(load);
   const now = useNow();
+  const { user } = useSession();
+  const navigate = useNavigate();
   const [toggleError, setToggleError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function toggle(enabled: boolean) {
+    if (!user) return navigate('/entrar'); // acompanhar exige login
     setBusy(true);
     setToggleError(null);
     try {

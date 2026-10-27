@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import type { Api } from '../api';
@@ -6,14 +6,18 @@ import { ApiContext } from '../api/context';
 import { createMockAuctions } from '../api/mock';
 import { HomePage } from './HomePage';
 
-function renderWith(api: Partial<Api>) {
-  return render(
+function tree(api: Partial<Api>) {
+  return (
     <ApiContext.Provider value={api as Api}>
       <MemoryRouter>
         <HomePage />
       </MemoryRouter>
-    </ApiContext.Provider>,
+    </ApiContext.Provider>
   );
+}
+
+function renderWith(api: Partial<Api>) {
+  return render(tree(api));
 }
 
 const detailLinks = () =>
@@ -64,7 +68,21 @@ describe('HomePage', () => {
     expect(screen.getByText('Entre com o Google')).toBeTruthy();
   });
 
-  it('erro da API aparece na tela', async () => {
+  it('exclui leilão ativo cujo tempo já venceu (gap antes da varredura do cron)', async () => {
+    const base = createMockAuctions();
+    const list = vi.fn(async () => {
+      const rows = await base.list();
+      // ainda `active` no banco, mas o end_at já passou — timer morto se aparecesse.
+      rows[0] = { ...rows[0]!, status: 'active', endAt: new Date(Date.now() - 1000).toISOString() };
+      return rows;
+    });
+    renderWith({ auctions: { ...base, list } });
+    await screen.findByRole('heading', { level: 1 });
+    const hrefs = detailLinks().map((l) => l.getAttribute('href'));
+    expect(hrefs).not.toContain('/leiloes/1874211'); // vencido, fora
+  });
+
+  it('erro da API aparece na tela (carga inicial, sem dados)', async () => {
     const auctions = {
       ...createMockAuctions(),
       list: vi.fn(async () => {
@@ -73,5 +91,28 @@ describe('HomePage', () => {
     };
     renderWith({ auctions });
     expect((await screen.findByRole('alert')).textContent).toContain('Failed to fetch');
+  });
+
+  it('erro num refetch não derruba os cards já carregados (sem alerta por cima)', async () => {
+    const base = createMockAuctions();
+    // 1ª carga OK; a troca de identidade do `api` (abaixo) simula o refetch, que falha.
+    const okApi: Partial<Api> = { auctions: base };
+    const failApi: Partial<Api> = {
+      auctions: {
+        ...base,
+        list: vi.fn(async () => {
+          throw new Error('blip de rede');
+        }),
+      },
+    };
+
+    const { rerender } = renderWith(okApi);
+    await waitFor(() => expect(detailLinks()).toHaveLength(5));
+
+    rerender(tree(failApi));
+    // os cards antigos continuam e nenhum alerta aparece por cima deles.
+    await waitFor(() => expect(failApi.auctions!.list).toHaveBeenCalled());
+    expect(detailLinks()).toHaveLength(5);
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });

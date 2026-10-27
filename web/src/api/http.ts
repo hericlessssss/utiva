@@ -30,7 +30,14 @@ export function createHttp(baseUrl: string, fetchFn: typeof fetch = fetch): Http
   const base = baseUrl.replace(/\/$/, '');
 
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const init: RequestInit = { method, headers: { accept: 'application/json' } };
+    // `credentials: 'include'` carrega o cookie de sessão (auth). Em same-origin (prod e a API
+    // servindo o web/dist na :3000) é o caminho normal; deixa explícito e cobre um backend
+    // cross-origin com CORS, se um dia existir.
+    const init: RequestInit = {
+      method,
+      credentials: 'include',
+      headers: { accept: 'application/json' },
+    };
     if (body !== undefined) {
       init.headers = { ...init.headers, 'content-type': 'application/json' };
       init.body = JSON.stringify(body);

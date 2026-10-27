@@ -5,6 +5,7 @@ import { Coin } from '../components/Coin';
 import { Sprite } from '../components/Sprite';
 import { Timer } from '../components/Timer';
 import { bidOf, formatGold, sortAuctions } from '../lib/auction-list';
+import { remainingMs } from '../lib/time';
 import { useLoad, useNow } from '../lib/use-load';
 
 const RECENT_COUNT = 5;
@@ -20,17 +21,21 @@ export function HomePage() {
     return () => clearInterval(id);
   }, []);
 
-  const load = useCallback(() => {
-    void tick; // a mudança de `tick` re-cria o load → useLoad re-busca (acompanha o cron)
-    return api.auctions.list();
-  }, [api, tick]);
-  const { data, error, loading } = useLoad(load);
+  const load = useCallback(() => api.auctions.list(), [api]);
+  const { data, error, loading } = useLoad(load, tick); // `tick` re-busca a cada ciclo (acompanha o cron)
   const now = useNow();
-  // Só leilões ativos na vitrine pública: um encerrado apareceria com timer zerado, péssima
-  // primeira impressão.
-  const recent = useMemo(
-    () => (data ? sortAuctions(data.filter((a) => a.status === 'active'), 'recent').slice(0, RECENT_COUNT) : []),
+  // Ativos ordenados por recência: só depende de `data`, então não re-ordena a cada segundo.
+  const activeByRecent = useMemo(
+    () => (data ? sortAuctions(data.filter((a) => a.status === 'active'), 'recent') : []),
     [data],
+  );
+  // Vitrine só com leilões vivos: um encerrado apareceria com timer zerado, péssima primeira
+  // impressão. Checa o tempo restante (`endAt > now`), não só `status`: entre o `end_at` vencer
+  // e a varredura do cron marcar `finished`, a linha ainda vem `active` — é esse intervalo que
+  // mostraria o timer morto. Só filtra+corta por `now` (barato), sem re-ordenar por segundo.
+  const recent = useMemo(
+    () => activeByRecent.filter((a) => remainingMs(a.endAt, now) > 0).slice(0, RECENT_COUNT),
+    [activeByRecent, now],
   );
 
   return (
@@ -58,13 +63,15 @@ export function HomePage() {
           <Link to="/leiloes">ver todos →</Link>
         </div>
 
-        {error && (
+        {/* Só alerta quando não há nada pra mostrar (carga inicial). Num hiccup do refetch de
+            60s mantém os cards antigos na tela em vez de piscar um erro por cima deles. */}
+        {error && !data && (
           <p role="alert" className="alert">
             {error}
           </p>
         )}
         {loading && !data && <p className="empty">Carregando…</p>}
-        {data && recent.length === 0 && <p className="empty">Nenhum leilão ainda.</p>}
+        {data && recent.length === 0 && <p className="empty">Nenhum leilão ativo agora.</p>}
 
         <ul className="home-cards">
           {recent.map((a) => (
@@ -139,7 +146,11 @@ export function HomePage() {
             <p>A gente manda um link de confirmação uma vez. Clicou, os alertas começam a chegar.</p>
           </li>
         </ol>
-        <p className="home-note">Login com Google está sendo montado e chega na próxima atualização.</p>
+        <div className="hero-cta">
+          <Link to="/entrar" className="btn">
+            Entrar com o Google
+          </Link>
+        </div>
       </section>
     </div>
   );

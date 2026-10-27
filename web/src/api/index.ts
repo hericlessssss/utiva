@@ -1,4 +1,5 @@
 import { createAuctionsApi, type AuctionsApi } from './auctions';
+import { createAuthApi, type AuthApi } from './auth';
 import { API_BASE } from './base';
 import { createFiltersApi, type FiltersApi } from './filters';
 import { createHttp } from './http';
@@ -7,6 +8,7 @@ import { createMockAuctions } from './mock';
 export interface Api {
   auctions: AuctionsApi;
   filters: FiltersApi;
+  auth: AuthApi;
 }
 
 /**
@@ -19,6 +21,7 @@ export function createApi(baseUrl: string, forceMock = false): Api {
   return {
     auctions: forceMock ? mock : createAuctionsApi(http, mock),
     filters: createFiltersApi(http),
+    auth: createAuthApi(http, baseUrl),
   };
 }
 

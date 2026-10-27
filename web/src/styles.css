@@ -1053,6 +1053,68 @@ button.danger {
   font-style: italic;
 }
 
+/* ---------- auth (topbar + login) ---------- */
+
+.topbar-auth {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.topbar-auth-login {
+  font: 10px/1 var(--font-pixel);
+  color: var(--gold);
+  text-decoration: none;
+  padding: 6px 0;
+  border-bottom: 2px solid transparent;
+}
+
+.topbar-auth-login:hover {
+  color: var(--ink);
+}
+
+.topbar-auth-login.active {
+  color: var(--ink);
+  border-bottom-color: var(--gold);
+}
+
+.user-avatar {
+  display: block;
+  border: 1px solid var(--line);
+}
+
+.user-name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: 10px/1 var(--font-pixel);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  color: var(--blood);
+}
+
+.login {
+  max-width: 460px;
+}
+
+.login-lead {
+  margin: 8px 0 20px;
+  color: var(--ink);
+}
+
 @media (max-width: 640px) {
   .hero-title {
     font-size: 30px;
@@ -1064,5 +1126,10 @@ button.danger {
 
   .steps {
     grid-template-columns: 1fr;
+  }
+
+  /* No estreito o nome come o topbar; sobra avatar + Sair, que bastam. */
+  .user-name {
+    display: none;
   }
 }
