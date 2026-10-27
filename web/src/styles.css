@@ -864,3 +864,272 @@ button.danger {
     padding-top: 2px;
   }
 }
+
+/* ---------- home (página inicial pública) ---------- */
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+}
+
+.hero {
+  padding: 24px 0 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.hero-kicker {
+  margin: 0 0 12px;
+  font: 11px/1 var(--font-pixel);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.hero-title {
+  margin: 0;
+  max-width: 18ch;
+  font-size: 40px;
+  line-height: 1.1;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.hero-sub {
+  margin: 16px 0 0;
+  max-width: 56ch;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.hero-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 18px;
+  background: var(--gold);
+  color: var(--bg);
+  border: 1px solid var(--gold);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.btn:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  text-decoration: none;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line);
+  font-weight: 600;
+}
+
+.btn-ghost:hover {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--gold);
+}
+
+.home-recent-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-cards {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.home-card {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.home-card:hover {
+  border-color: var(--gold);
+  text-decoration: none;
+}
+
+.home-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.home-card-name {
+  font-weight: 600;
+}
+
+.home-card-meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.home-card-bid {
+  font-size: 18px;
+}
+
+.home-card-end {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  text-align: right;
+}
+
+.home-about {
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+
+.steps {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.step {
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--gold);
+  color: var(--bg);
+  font: 16px/1 var(--font-num);
+  font-weight: 700;
+}
+
+.step h3 {
+  margin: 12px 0 6px;
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.step p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.home-note {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* ---------- auth (topbar + login) ---------- */
+
+.topbar-auth {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.topbar-auth-login {
+  font: 10px/1 var(--font-pixel);
+  color: var(--gold);
+  text-decoration: none;
+  padding: 6px 0;
+  border-bottom: 2px solid transparent;
+}
+
+.topbar-auth-login:hover {
+  color: var(--ink);
+}
+
+.topbar-auth-login.active {
+  color: var(--ink);
+  border-bottom-color: var(--gold);
+}
+
+.user-avatar {
+  display: block;
+  border: 1px solid var(--line);
+}
+
+.user-name {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: 10px/1 var(--font-pixel);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.link-btn:hover {
+  color: var(--blood);
+}
+
+.login {
+  max-width: 460px;
+}
+
+.login-lead {
+  margin: 8px 0 20px;
+  color: var(--ink);
+}
+
+@media (max-width: 640px) {
+  .hero-title {
+    font-size: 30px;
+  }
+
+  .home-card-end {
+    align-self: center;
+  }
+
+  .steps {
+    grid-template-columns: 1fr;
+  }
+
+  /* No estreito o nome come o topbar; sobra avatar + Sair, que bastam. */
+  .user-name {
+    display: none;
+  }
+}

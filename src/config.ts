@@ -1,5 +1,19 @@
 import { resolvePort } from './env.js';
 
+/** Config do login com Google (OIDC) — Fase 2. Presente só quando GOOGLE_CLIENT_ID está setado. */
+export interface AuthConfig {
+  googleClientId: string;
+  googleClientSecret: string;
+  /** Precisa bater com um "Authorized redirect URI" do client no Console. */
+  redirectUri: string;
+  /** Segredo que assina os cookies de sessão/estado. */
+  cookieSecret: string;
+  /** Para onde redirecionar o browser após o login. */
+  postLoginRedirect: string;
+  /** Marca os cookies como Secure (só HTTPS) — ligado quando o redirect é https. */
+  secureCookies: boolean;
+}
+
 export interface AppConfig {
   port: number;
   host: string;
@@ -13,6 +27,8 @@ export interface AppConfig {
   webDist?: string;
   /** Pasta de cache dos sprites do bazar (ADR 10); default `.sprite-cache`. */
   spriteCacheDir: string;
+  /** Login com Google; ausente desliga as rotas /auth/* (ex.: dev sem OAuth configurado). */
+  auth?: AuthConfig;
 }
 
 type Env = Record<string, string | undefined>;
@@ -21,6 +37,26 @@ function required(env: Env, key: string): string {
   const value = env[key]?.trim();
   if (!value) throw new Error(`Variável de ambiente obrigatória ausente: ${key}`);
   return value;
+}
+
+/**
+ * Monta a config de auth quando GOOGLE_CLIENT_ID está presente. Nesse caso, Secret e
+ * Cookie Secret passam a ser obrigatórios (falha rápido em vez de subir um login quebrado).
+ * Sem GOOGLE_CLIENT_ID, devolve undefined e as rotas /auth/* não são registradas.
+ */
+function loadAuthConfig(env: Env): AuthConfig | undefined {
+  const googleClientId = env.GOOGLE_CLIENT_ID?.trim();
+  if (!googleClientId) return undefined;
+
+  const redirectUri = env.OAUTH_REDIRECT_URI?.trim() || 'http://localhost:3000/auth/callback';
+  return {
+    googleClientId,
+    googleClientSecret: required(env, 'GOOGLE_CLIENT_SECRET'),
+    redirectUri,
+    cookieSecret: required(env, 'COOKIE_SECRET'),
+    postLoginRedirect: env.POST_LOGIN_REDIRECT?.trim() || '/',
+    secureCookies: redirectUri.startsWith('https:'),
+  };
 }
 
 /** Lê e valida a config da aplicação a partir do ambiente (falha rápido se faltar algo). */
@@ -40,5 +76,6 @@ export function loadConfig(env: Env): AppConfig {
     scrapeCron: env.SCRAPE_CRON?.trim() || '*/5 * * * *',
     webDist: env.WEB_DIST?.trim() || undefined,
     spriteCacheDir: env.SPRITE_CACHE_DIR?.trim() || '.sprite-cache',
+    auth: loadAuthConfig(env),
   };
 }

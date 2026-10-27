@@ -61,7 +61,7 @@ async function main(): Promise<void> {
     fetchImage: tibiaImageFetcher(session.creds),
   });
 
-  const app = buildApp({ prisma, boss, webDist: cfg.webDist, spriteStore });
+  const app = buildApp({ prisma, boss, webDist: cfg.webDist, spriteStore, auth: cfg.auth });
 
   const cronHandle = startScraperCron(cfg.scrapeCron, async () => {
     const enqueued = await enqueueNewForActiveFilters(prisma, boss, {}, session.fetchPage);

@@ -45,4 +45,45 @@ describe('loadConfig', () => {
 
     expect(() => loadConfig(withoutKey)).toThrow(/RESEND_API_KEY/);
   });
+
+  it('sem GOOGLE_CLIENT_ID, auth fica desligado', () => {
+    expect(loadConfig(base).auth).toBeUndefined();
+  });
+
+  it('com GOOGLE_CLIENT_ID, monta auth com defaults', () => {
+    const cfg = loadConfig({
+      ...base,
+      GOOGLE_CLIENT_ID: 'client-123',
+      GOOGLE_CLIENT_SECRET: 'secret',
+      COOKIE_SECRET: 'cookie-secret',
+    });
+
+    expect(cfg.auth).toEqual({
+      googleClientId: 'client-123',
+      googleClientSecret: 'secret',
+      redirectUri: 'http://localhost:3000/auth/callback',
+      cookieSecret: 'cookie-secret',
+      postLoginRedirect: '/',
+      secureCookies: false,
+    });
+  });
+
+  it('redirect https liga cookies Secure', () => {
+    const cfg = loadConfig({
+      ...base,
+      GOOGLE_CLIENT_ID: 'client-123',
+      GOOGLE_CLIENT_SECRET: 'secret',
+      COOKIE_SECRET: 'cookie-secret',
+      OAUTH_REDIRECT_URI: 'https://utiva.gg/auth/callback',
+    });
+
+    expect(cfg.auth?.secureCookies).toBe(true);
+    expect(cfg.auth?.redirectUri).toBe('https://utiva.gg/auth/callback');
+  });
+
+  it('com GOOGLE_CLIENT_ID mas sem COOKIE_SECRET, lança', () => {
+    expect(() =>
+      loadConfig({ ...base, GOOGLE_CLIENT_ID: 'client-123', GOOGLE_CLIENT_SECRET: 'secret' }),
+    ).toThrow(/COOKIE_SECRET/);
+  });
 });

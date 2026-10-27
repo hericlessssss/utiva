@@ -41,7 +41,8 @@ Comprar personagens no **Char Bazaar oficial do Tibia** exige vigiar a lista de 
 | 6 | **pg-boss** (fila/scheduler em Postgres) | BullMQ + Redis | MVP pessoal não precisa de Redis; menos peças no monólito |
 | 7 | **Resend** (e-mail) | SES/SMTP | DX simples p/ beta |
 | 8 | **Monólito** em Docker Compose (local) → **VM GCP (e2-small)** | Cloud Run | Cron always-on + browser ocasional caem mal em serverless |
-| 9 | **Frontend em `web/`: Vite + React + TS, CSS puro com tokens, `react-router`**; projeto pnpm próprio, fora do workspace/Dockerfile | Next/Remix, lib de UI, Tailwind | Painel pessoal, 3 telas, sem SSR nem auth; visual artesanal (pixel/medieval) não combina com kit de componentes. Em dev o Vite faz proxy de `/api` → API. Em prod a própria API serve o `web/dist` na mesma origem (`@fastify/static` + fallback SPA pro `index.html` em GET que aceita html; `WEB_DIST` no env, stage `web` no Dockerfile) — sem CORS, uma porta só. Por isso as rotas do painel são em pt-BR (`/`, `/leiloes/:id`, `/filtros`): não colidem com as da API (`/auctions`, `/filters`) |
+| 9 | **Frontend em `web/`: Vite + React + TS, CSS puro com tokens, `react-router`**; projeto pnpm próprio, fora do workspace/Dockerfile | Next/Remix, lib de UI, Tailwind | Painel pessoal, 3 telas, sem SSR nem auth; visual artesanal (pixel/medieval) não combina com kit de componentes. Em dev o Vite faz proxy de `/api` → API. Em prod a própria API serve o `web/dist` na mesma origem (`@fastify/static` + fallback SPA pro `index.html` em GET que aceita html; `WEB_DIST` no env, stage `web` no Dockerfile) — sem CORS, uma porta só. Por isso as rotas do painel são em pt-BR (`/` home pública, `/leiloes`, `/leiloes/:id`, `/filtros`): não colidem com as da API (`/auctions`, `/filters`, `/sprites`) |
+| 11 | **Login com Google (OIDC) via Authorization Code + PKCE, feito à mão (undici+crypto), sessão em tabela própria com cookie httpOnly** | Supabase Auth / NextAuth / lib OIDC (openid-client) | Um provedor só (Google) e escopos básicos (`openid email profile`) não justificam uma lib ou um serviço gerenciado. O id_token vem direto do endpoint de token por TLS → validar claims (iss/aud/exp) basta, sem JWKS. Sessão opaca em tabela (PK = hash do token) é revogável e não vaza cookie em leitura do banco. `@fastify/cookie` é a única dependência nova (plugin de 1ª parte) |
 | 10 | **Sprites (outfits/mounts/itens): capturar a URL do próprio tibia.com e servir por um proxy com cache no nosso backend** | Biblioteca de sprites (npm-tibia-assets), gerador de outfit, pré-download em massa | O tibia.com já hospeda os GIFs **animados**, com as addons certas, indexados por id, em `static.tibia.com/images/charactertrade/{outfits,mounts,objects}/{id}.gif` — e essas URLs já vêm no HTML do detalhe que raspamos. Gerar sprite nós mesmos seria overengineering. Hotlink direto do browser dá **403** (bloqueio de hotlink/Cloudflare; o browser em outra origem não manda o `cf_clearance` do tibia). Logo um **proxy** `GET /sprites/:cat/:file` busca via as creds da sessão `cf` (`tibiaImageFetcher`) e cacheia em disco (imutável por id; só cacheia resposta que é mesmo imagem — o challenge do Cloudflare vem como HTML com 200; single-flight + escrita atômica). A **Lista** (fase 1) já traz o outfit do char (`AuctionOutfitImage`) e os itens de exibição do card (`AuctionItemsViewBox`), persistidos em `auction.outfit`/`display_items`; o **Detalhe** (fase 2) traz itens/mounts/outfits completos. Skills viram **barra CSS** (já temos `level`+`percent`, zero asset). Fora do v1: ícones de imbuement/charm (são linhas de texto na página, exigiriam dicionário nome→id — YAGNI) |
 
 ---
@@ -153,6 +154,37 @@ Ao marcar `watched_auction`, calcular os thresholds a partir de `end_at` e agend
 - **Pendente:** registrar domínio (`.com`/`.gg`) e handle no GitHub; confirmar disponibilidade antes do deploy público.
 - **Design (definido, implementado em `web/src/styles.css`):** Silkscreen no wordmark e rótulos de seção, VT323 nos números e timers, Inter no corpo. Tokens: `--bg #0f0d0a`, `--surface #17130d`, `--surface-2 #211a11`, `--ink #e7dcc4`, `--muted #9a8f78`, `--gold #e0b64a` (acento), `--blood #a81717` (urgência: timer com menos de 1h vira bloco sangue), `--line #3a3024` (hairline). Cantos retos, sem sombra/gradiente, marcador de 8px em dourado nas linhas acompanhadas, switch pixelado. Só tema escuro; funciona em 360px.
 - **Códigos dos filtros** (lidos do formulário do tibia.com em out/2026, em `web/src/lib/options.ts`): vocação `1` None · `2` Druid · `3` Knight · `4` Paladin · `5` Sorcerer · `6` Monk; skill `1` Magic · `6` Shielding · `7` Distance · `8` Sword · `9` Club · `10` Axe · `11` Fist · `13` Fishing; PvP `0`–`4` (Open, Optional, Hardcore, Retro Open, Retro Hardcore); BattlEye `1` initially protected · `2` protected · `3` not protected. O backend repassa como vem.
+
+---
+
+## 14. Autenticação e multiusuário (pivot pós-v1)
+
+A partir de out/2026 o Utiva deixa de ser single-user local: amigos vão usar, então ganha **home pública + login + multiusuário**. Isso inverte o não-objetivo central do v1 (§1/§2) — o roadmap §11 ("multi-usuário SaaS") foi antecipado.
+
+**Decisões:**
+- **Cadastro aberto:** qualquer conta Google entra (sem allowlist). Por isso a Fase 4 (e-mail por usuário) vai exigir double opt-in, rate-limit e verificação mais rígidos contra abuso/custo.
+- **Login só com Google (OIDC).** Fluxo Authorization Code + PKCE + `state` (CSRF). O `google_sub` é a identidade estável; e-mail/nome/foto são atualizados a cada login.
+- **Sessão em tabela própria** (`session`), com cookie `httpOnly` `SameSite=Lax`. A PK é o SHA-256 do token; o cookie carrega o token cru. `Secure` liga sozinho quando o `redirect_uri` é https.
+- **Auth é opcional por config:** sem `GOOGLE_CLIENT_ID`, as rotas `/auth/*` não sobem (dev sem OAuth, e testes que não precisam dele).
+
+**Fases:** 0 home pública ✅ · 1 landing ✅ · **2 backend de auth ✅** (user + OIDC + sessão: `/auth/google`, `/auth/callback`, `/auth/logout`, `/auth/me`) · **3 dados por usuário ✅** (`user_id` em `watch_filter`/`watched_auction`; rotas escopadas; fluxos A/B por dono; `/filtros` e watch atrás de login) · **4 e-mail por usuário** (destinatário ✅ nos fluxos A/B; falta double opt-in/verificação) · **5 UX de login no frontend ✅** (tela `/entrar`, topbar logado/deslogado, logout; `SessionProvider`; `RequireAuth` em `/filtros`) · 6 deploy GCP + HTTPS (adicionar o `redirect_uri` de produção no Console).
+
+**Frontend (Fase 5):** `web/src/api/auth.ts` (`me`→null em 401, `logout`, `loginUrl`), `web/src/auth/session.tsx` (`SessionProvider`+`useSession`), `web/src/pages/LoginPage.tsx` (`/entrar`; já logado → redirect pra `/`). O login é um **link top-level** pro backend (`<a href={loginUrl}>`), não fetch. **Dev:** o cookie de sessão só fecha o ciclo em same-origin (a API servindo `web/dist` na :3000); pelo Vite :5173 com proxy `/api` o cookie de :3000 não volta — testar login real só na :3000.
+
+**Contrato das rotas (Fase 2):**
+- `GET /auth/google` → 302 pro Google; seta cookie efêmero `utiva_oauth` (assinado, 10 min) com `{state, verifier}`.
+- `GET /auth/callback?code&state` → valida `state`, troca o código por tokens, lê o id_token, faz upsert do usuário, cria sessão e seta `utiva_session`; redireciona pra `POST_LOGIN_REDIRECT` (default `/`). `?error` (usuário cancelou) volta pra home sem sessão.
+- `POST /auth/logout` → apaga a sessão e limpa o cookie (204, idempotente).
+- `GET /auth/me` → identidade da sessão (200) ou 401.
+
+**Modelo (adições ao §6):** `user` (`id` uuid, `google_sub` único, email, name, picture) e `session` (`id` = hash do token, `user_id`, `expires_at`).
+
+**Fase 3 — dados por usuário (decisões 27/out):**
+- **`user_id` em `watch_filter` e `watched_auction`** (FK → `user`, `onDelete: Cascade`, NOT NULL). `watched_auction` deixa de ter PK `auction_id` → PK composta **`(user_id, auction_id)`** (vários usuários acompanham o mesmo leilão). `auction_match` segue por filtro (já é por usuário transitivamente). `notification` não existe como tabela (lembretes são jobs pg-boss) → nada a migrar lá.
+- **Migration destrutiva (dev):** limpa `watch_filter` + `watched_auction` (dado de teste local) antes de tornar `user_id` NOT NULL; `auction` fica intacto.
+- **Login obrigatório nas rotas de dados** (sem bypass em dev): preHandler `requireUser` → 401 sem sessão, em `/filters` (CRUD escopado ao dono) e `PUT /auctions/:id/watch`. `GET /auctions`/`:id` ficam **públicos** (home é pública) via `optionalUser` — o campo `watched` reflete o usuário logado, ou `null` anônimo.
+- **E-mail pro dono:** o fluxo A carrega `user_id`+e-mail do dono do filtro no job; o fluxo B idem no job de lembrete; os workers enviam pro e-mail do usuário (puxa a parte de destinatário da Fase 4). O `MAIL_TO` global vira só fallback.
+- **Frontend:** `/filtros` e o toggle de acompanhar exigem login (sem sessão → manda pra `/entrar`).
 
 ---
 

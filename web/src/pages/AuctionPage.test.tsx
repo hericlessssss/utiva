@@ -2,19 +2,30 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import type { Api } from '../api';
+import type { SessionUser } from '../api/auth';
 import { ApiContext } from '../api/context';
 import { ApiError } from '../api/http';
 import { createMockAuctions } from '../api/mock';
+import { SessionProvider } from '../auth/session';
 import { AuctionPage } from './AuctionPage';
 
-function renderAt(path: string, api: Partial<Api>) {
+const USER: SessionUser = { id: 'u1', email: 'a@b.com', name: 'A', picture: null };
+
+function renderAt(path: string, api: Partial<Api>, user: SessionUser | null = USER) {
+  const full = {
+    ...api,
+    auth: { me: vi.fn(async () => user), logout: vi.fn(), loginUrl: () => '/auth/google' },
+  } as unknown as Api;
   return render(
-    <ApiContext.Provider value={api as Api}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/leiloes/:id" element={<AuctionPage />} />
-        </Routes>
-      </MemoryRouter>
+    <ApiContext.Provider value={full}>
+      <SessionProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/leiloes/:id" element={<AuctionPage />} />
+            <Route path="/entrar" element={<p>login-page</p>} />
+          </Routes>
+        </MemoryRouter>
+      </SessionProvider>
     </ApiContext.Provider>,
   );
 }
@@ -47,7 +58,7 @@ describe('AuctionPage', () => {
     expect(screen.getByText('Detalhe ainda não carregado.')).toBeTruthy();
   });
 
-  it('toggle de acompanhar chama a API e reflete o estado', async () => {
+  it('logado: toggle de acompanhar chama a API e reflete o estado', async () => {
     const auctions = createMockAuctions();
     const spy = vi.spyOn(auctions, 'setWatched');
     renderAt('/leiloes/1874196', { auctions });
@@ -56,6 +67,16 @@ describe('AuctionPage', () => {
     fireEvent.click(sw);
     await waitFor(() => expect(sw.getAttribute('aria-checked')).toBe('true'));
     expect(spy).toHaveBeenCalledWith(1874196, true);
+  });
+
+  it('deslogado: clicar em acompanhar manda pra /entrar (não chama a API)', async () => {
+    const auctions = createMockAuctions();
+    const spy = vi.spyOn(auctions, 'setWatched');
+    renderAt('/leiloes/1874196', { auctions }, null); // sem usuário
+    const sw = await screen.findByRole('switch', { name: 'Acompanhar' });
+    fireEvent.click(sw);
+    expect(await screen.findByText('login-page')).toBeTruthy();
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it('404 vira alerta', async () => {

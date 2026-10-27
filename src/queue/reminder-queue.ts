@@ -6,6 +6,7 @@ import { reminderSchedule } from '../reminders/thresholds.js';
 export const REMINDER_QUEUE = 'auction-end-reminder';
 
 export interface ReminderJob {
+  userId: string;
   auctionId: number;
   label: string;
 }
@@ -24,6 +25,7 @@ const JOB_RETENTION_DAYS = 35;
 
 export async function scheduleReminders(
   boss: PgBoss,
+  userId: string,
   auctionId: number,
   endAt: Date,
   now: Date = new Date(),
@@ -33,11 +35,13 @@ export async function scheduleReminders(
   for (const reminder of reminders) {
     const jobId = await boss.send(
       REMINDER_QUEUE,
-      { auctionId, label: reminder.label } satisfies ReminderJob,
+      { userId, auctionId, label: reminder.label } satisfies ReminderJob,
       {
         startAfter: reminder.at,
         retentionDays: JOB_RETENTION_DAYS,
-        singletonKey: `${auctionId}:${reminder.label}`,
+        // singletonKey por (usuário, leilão, threshold): não duplica se o toggle for religado,
+        // e usuários diferentes acompanhando o mesmo leilão têm jobs independentes.
+        singletonKey: `${userId}:${auctionId}:${reminder.label}`,
         retryLimit: 5,
         retryDelay: 60,
         retryBackoff: true,
@@ -62,19 +66,27 @@ export interface ReminderWorkerDeps {
 export async function registerReminderWorker(boss: PgBoss, deps: ReminderWorkerDeps): Promise<void> {
   await boss.work<ReminderJob>(REMINDER_QUEUE, async (jobs) => {
     for (const job of jobs) {
-      const { auctionId, label } = job.data;
+      const { userId, auctionId, label } = job.data;
 
-      const auction = await deps.prisma.auction.findUnique({
-        where: { auctionId },
-        include: { watched: true },
+      // Só envia se ESTE usuário ainda acompanha o leilão (toggle ligado)...
+      const watched = await deps.prisma.watchedAuction.findUnique({
+        where: { userId_auctionId: { userId, auctionId } },
       });
-      if (!auction?.watched?.enabled) continue; // não acompanhado ou toggle desligado
+      if (!watched?.enabled) continue; // não acompanhado ou toggle desligado
+
+      const auction = await deps.prisma.auction.findUnique({ where: { auctionId } });
+      if (!auction) continue;
       if (auction.endAt.getTime() <= Date.now()) continue; // já terminou
+
+      // ...e manda pro e-mail do próprio usuário (resolvido no disparo: pega mudança de e-mail).
+      const user = await deps.prisma.user.findUnique({ where: { id: userId } });
+      if (!user) continue;
 
       await sendReminderAlert(
         deps.mailer,
         { auctionId, charName: auction.charName, endAt: auction.endAt },
         label,
+        user.email,
       );
     }
   });

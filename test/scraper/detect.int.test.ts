@@ -1,17 +1,25 @@
 import { readFileSync } from 'node:fs';
 import { PrismaClient } from '@prisma/client';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { detectNewAuctions } from '../../src/scraper/detect.js';
+import { makeUser } from '../helpers/auth.js';
 
 const fixture = readFileSync(new URL('../fixtures/list-page-1.html', import.meta.url), 'utf8');
 const prisma = new PrismaClient();
+let userId: string;
 
 async function newFilter(): Promise<number> {
-  const filter = await prisma.watchFilter.create({ data: {} });
+  const filter = await prisma.watchFilter.create({ data: { userId } });
   return filter.id;
 }
 
 describe('detectNewAuctions (integração, ponta a ponta fase 1)', () => {
+  beforeAll(async () => {
+    await prisma.watchFilter.deleteMany();
+    await prisma.user.deleteMany();
+    userId = (await makeUser(prisma)).id;
+  });
+
   beforeEach(async () => {
     await prisma.auctionMatch.deleteMany();
     await prisma.auction.deleteMany();
@@ -22,6 +30,7 @@ describe('detectNewAuctions (integração, ponta a ponta fase 1)', () => {
     await prisma.auctionMatch.deleteMany();
     await prisma.auction.deleteMany();
     await prisma.watchFilter.deleteMany();
+    await prisma.user.deleteMany();
     await prisma.$disconnect();
   });
 

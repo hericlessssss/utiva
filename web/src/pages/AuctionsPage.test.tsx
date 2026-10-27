@@ -2,16 +2,26 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import type { Api } from '../api';
+import type { SessionUser } from '../api/auth';
 import { ApiContext } from '../api/context';
 import { createMockAuctions } from '../api/mock';
+import { SessionProvider } from '../auth/session';
 import { AuctionsPage } from './AuctionsPage';
 
-function renderWith(api: Partial<Api>) {
+const USER: SessionUser = { id: 'u1', email: 'a@b.com', name: 'A', picture: null };
+
+function renderWith(api: Partial<Api>, user: SessionUser | null = USER) {
+  const full = {
+    ...api,
+    auth: { me: vi.fn(async () => user), logout: vi.fn(), loginUrl: () => '/auth/google' },
+  } as unknown as Api;
   return render(
-    <ApiContext.Provider value={api as Api}>
-      <MemoryRouter>
-        <AuctionsPage />
-      </MemoryRouter>
+    <ApiContext.Provider value={full}>
+      <SessionProvider>
+        <MemoryRouter>
+          <AuctionsPage />
+        </MemoryRouter>
+      </SessionProvider>
     </ApiContext.Provider>,
   );
 }

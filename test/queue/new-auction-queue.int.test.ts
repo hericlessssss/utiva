@@ -51,10 +51,10 @@ describe('fila new-auction (integração)', () => {
         return Promise.resolve();
       },
     });
-    await enqueueNewAuction(boss, entry);
+    await enqueueNewAuction(boss, entry, { userId: 'u1', to: 'dono@x' });
     await done;
 
-    expect(received[0]!.to).toBe('me@x');
+    expect(received[0]!.to).toBe('dono@x'); // vai pro dono do filtro, não pro MAIL_TO global
     expect(received[0]!.subject).toContain('Kord Di');
   });
 });
