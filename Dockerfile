@@ -43,6 +43,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
   && node_modules/.bin/playwright install --with-deps chromium \
   && chmod -R a+rx /ms-playwright \
   && rm -rf /var/lib/apt/lists/*
+# Regera o Prisma Client AQUI, com o openssl 3.x ja instalado, pro query engine bater com o
+# target do SO (debian-openssl-3.0.x). Gerado no stage `deps` (node:slim, sem openssl) saía só
+# o engine 1.1.x; com openssl 3.x no runtime o client nao achava o engine e o app crashava.
+RUN node_modules/.bin/prisma generate
+# O prisma CLI roda no boot (`migrate deploy` no compose) e precisa escrever no dir de engines;
+# como o app roda como `node` e o node_modules foi copiado como root, cai em "Can't write to
+# @prisma/engines" e o container entra em crash loop. Damos a posse das pastas do Prisma ao node.
+RUN chown -R node:node \
+    node_modules/.pnpm/@prisma+* \
+    node_modules/.pnpm/prisma@* \
+    node_modules/@prisma \
+    node_modules/.prisma \
+  2>/dev/null || true
 # /data guarda o estado de runtime (cookie cf_clearance + cache de sprites) num volume.
 # Criado com dono `node` pra o volume nomeado herdar a permissão (o processo roda como node).
 RUN mkdir -p /data && chown node:node /data
