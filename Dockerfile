@@ -33,8 +33,15 @@ COPY --from=build /app/dist ./dist
 COPY --from=web /app/web/dist ./web/dist
 COPY package.json ./
 COPY prisma ./prisma
+# Playwright grava os browsers neste caminho (em vez de ~/.cache), pra o processo `node` achá-los
+# no runtime — o install roda como root e o cache fica legível pra todos.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 # openssl: o Prisma precisa dele em runtime (sem, loga warning e pode errar o query engine).
+# chromium: o renovador do cf_clearance (Playwright) só roda com o browser instalado; sem ele,
+# todo tick morre com CfRenewalError e o bazar nunca popula. `--with-deps` traz as libs do SO.
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && node_modules/.bin/playwright install --with-deps chromium \
+  && chmod -R a+rx /ms-playwright \
   && rm -rf /var/lib/apt/lists/*
 # /data guarda o estado de runtime (cookie cf_clearance + cache de sprites) num volume.
 # Criado com dono `node` pra o volume nomeado herdar a permissão (o processo roda como node).
