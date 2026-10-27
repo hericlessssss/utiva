@@ -1,0 +1,7 @@
+# Scripts e configs que rodam em Linux precisam de LF — CRLF quebra o shebang/bash
+# e o startup-script da VM. Normaliza independente do autocrlf do Windows.
+*.sh text eol=lf
+Caddyfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Dockerfile text eol=lf
