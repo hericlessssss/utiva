@@ -14,15 +14,25 @@ export const testAuth: AuthConfig = {
 
 let seq = 0;
 
-/** Cria (ou reusa, pelo sub) um usuário de teste. Email único por chamada se omitido. */
-export function makeUser(prisma: PrismaClient, email?: string): Promise<User> {
+/**
+ * Cria (ou reusa, pelo sub) um usuário de teste. Email único por chamada se omitido. Por
+ * padrão já com double opt-in confirmado (`confirmed`), já que a maioria dos testes assume
+ * que o usuário recebe alertas; passe `false` pra exercitar o gate de confirmação.
+ */
+export async function makeUser(
+  prisma: PrismaClient,
+  email?: string,
+  confirmed = true,
+): Promise<User> {
   const e = email ?? `tester${++seq}@utiva.test`;
-  return upsertUserByGoogle(prisma, {
+  const user = await upsertUserByGoogle(prisma, {
     sub: `sub-${e}`,
     email: e,
     emailVerified: true,
     name: 'Tester',
   });
+  if (!confirmed) return user;
+  return prisma.user.update({ where: { id: user.id }, data: { emailOptInAt: new Date() } });
 }
 
 /** Cria uma sessão e devolve o cookie pronto pra app.inject({ cookies }). */

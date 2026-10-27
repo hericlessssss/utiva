@@ -20,7 +20,7 @@ function Consumer() {
 }
 
 function renderWith(auth: Partial<Api['auth']>) {
-  const api = { auth: { me: vi.fn(), logout: vi.fn(), loginUrl: () => '/auth/google', ...auth } };
+  const api = { auth: { me: vi.fn(), logout: vi.fn(), resendVerification: vi.fn(), loginUrl: () => '/auth/google', ...auth } };
   return render(
     <ApiContext.Provider value={api as unknown as Api}>
       <SessionProvider>
@@ -30,7 +30,7 @@ function renderWith(auth: Partial<Api['auth']>) {
   );
 }
 
-const user: SessionUser = { id: 'u1', email: 'jogador@gmail.com', name: 'Jogador', picture: null };
+const user: SessionUser = { id: 'u1', email: 'jogador@gmail.com', name: 'Jogador', picture: null, emailVerified: true };
 
 describe('SessionProvider', () => {
   it('expõe o usuário após /auth/me resolver', async () => {
@@ -58,7 +58,7 @@ describe('SessionProvider', () => {
 describe('RequireAuth', () => {
   function renderGuarded(sessionUser: SessionUser | null) {
     const api = {
-      auth: { me: vi.fn(async () => sessionUser), logout: vi.fn(), loginUrl: () => '/auth/google' },
+      auth: { me: vi.fn(async () => sessionUser), logout: vi.fn(), resendVerification: vi.fn(), loginUrl: () => '/auth/google' },
     };
     return render(
       <ApiContext.Provider value={api as unknown as Api}>

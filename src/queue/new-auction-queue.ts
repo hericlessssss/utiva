@@ -1,13 +1,14 @@
 import type PgBoss from 'pg-boss';
-import { sendNewAuctionAlert, type MailerConfig } from '../mailer/mailer.js';
+import { buildNewAuctionEmail } from '../mailer/new-auction-email.js';
+import { deliverToUser, type DeliverDeps } from '../mailer/user-mailer.js';
 import type { AuctionListEntry } from '../scraper/list-parser.js';
 
 export const NEW_AUCTION_QUEUE = 'new-auction-email';
 
-/** Destinatário do alerta: dono do filtro que capturou o leilão (fluxo por usuário). */
+/** Destinatário do alerta: dono do filtro que capturou o leilão. O e-mail é resolvido do
+ * banco no envio (pega mudança de e-mail), então aqui basta o id do dono. */
 export interface AlertRecipient {
   userId: string;
-  to: string;
 }
 
 /** Forma serializável do leilão no job (Date vira ISO string no JSON do pg-boss). */
@@ -20,9 +21,8 @@ export interface NewAuctionJob {
   world: string;
   endsAt: string;
   bid: { amount: number; kind: 'current' | 'minimum' };
-  /** Dono do filtro (pra quem vai o e-mail) e seu endereço, resolvidos no enqueue. */
+  /** Dono do filtro (pra quem vai o e-mail), resolvido no enqueue. */
   userId: string;
-  to: string;
 }
 
 export function toJob(entry: AuctionListEntry, recipient: AlertRecipient): NewAuctionJob {
@@ -38,13 +38,12 @@ export function toJob(entry: AuctionListEntry, recipient: AlertRecipient): NewAu
     bid,
     endsAt: entry.endsAt.toISOString(),
     userId: recipient.userId,
-    to: recipient.to,
   };
 }
 
 export function fromJob(job: NewAuctionJob): AuctionListEntry {
   // O job não carrega outfit/itens de exibição (toJob não os serializa); reconstituímos vazios
-  // só pra satisfazer o tipo do entry consumido pelo mailer. userId/to não fazem parte do entry.
+  // só pra satisfazer o tipo do entry consumido pelo mailer. userId não faz parte do entry.
   const { auctionId, characterName, level, vocation, sex, world, bid } = job;
   return {
     auctionId,
@@ -79,15 +78,18 @@ export async function enqueueNewAuction(
 }
 
 /**
- * Registra o worker que consome os jobs e envia o e-mail via mailer.
- * Assume batchSize=1 (default): cada batch traz 1 job, então um erro re-tenta só esse job.
- * Se um dia batchSize for aumentado, isolar cada job (try/catch por item) pra não re-enviar
- * os já entregues no mesmo batch.
+ * Registra o worker que consome os jobs e entrega o e-mail via `deliverToUser` (gate de
+ * opt-in + rate-limit, Fase 4). Assume batchSize=1 (default): cada batch traz 1 job, então
+ * um erro re-tenta só esse job. Se um dia batchSize for aumentado, isolar cada job (try/catch
+ * por item) pra não re-enviar os já entregues no mesmo batch.
  */
-export async function registerNewAuctionWorker(boss: PgBoss, mailer: MailerConfig): Promise<void> {
+export async function registerNewAuctionWorker(boss: PgBoss, deps: DeliverDeps): Promise<void> {
   await boss.work<NewAuctionJob>(NEW_AUCTION_QUEUE, async (jobs) => {
     for (const job of jobs) {
-      await sendNewAuctionAlert(mailer, fromJob(job.data), job.data.to);
+      const result = await deliverToUser(deps, job.data.userId, buildNewAuctionEmail(fromJob(job.data)));
+      if (result === 'rate-limited') {
+        console.warn(`[alert] usuário ${job.data.userId} no teto de e-mails — alerta dropado`);
+      }
     }
   });
 }

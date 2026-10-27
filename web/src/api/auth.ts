@@ -5,12 +5,16 @@ export interface SessionUser {
   email: string;
   name: string | null;
   picture: string | null;
+  /** Double opt-in (Fase 4): se o e-mail foi confirmado. Pendente → não recebe alertas. */
+  emailVerified: boolean;
 }
 
 export interface AuthApi {
   /** Usuário da sessão atual, ou `null` quando não há login (401). */
   me(): Promise<SessionUser | null>;
   logout(): Promise<void>;
+  /** Reenvia o e-mail de confirmação (double opt-in). */
+  resendVerification(): Promise<void>;
   /** URL do backend que inicia o OAuth com o Google (navegação top-level, não fetch). */
   loginUrl(): string;
 }
@@ -26,6 +30,7 @@ export function createAuthApi(http: Http, baseUrl: string): AuthApi {
       }
     },
     logout: () => http.send('POST', '/auth/logout'),
+    resendVerification: () => http.send('POST', '/auth/resend-verification'),
     loginUrl: () => `${baseUrl}/auth/google`,
   };
 }

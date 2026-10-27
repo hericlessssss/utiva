@@ -1,6 +1,4 @@
-import type { AuctionListEntry } from '../scraper/list-parser.js';
-import { buildNewAuctionEmail, type EmailContent } from './new-auction-email.js';
-import { buildReminderEmail, type ReminderTarget } from './reminder-email.js';
+import type { EmailContent } from './new-auction-email.js';
 
 export interface EmailMessage {
   from: string;
@@ -18,27 +16,10 @@ export interface MailerConfig {
   to: string;
 }
 
-// `to` opcional sobrepõe o destinatário global (cfg.to): multiusuário envia pro e-mail do dono;
-// o cfg.to fica como fallback (dev/single-user).
-async function send(cfg: MailerConfig, content: EmailContent, to?: string): Promise<void> {
+/**
+ * Envia um conteúdo já montado. `to` opcional sobrepõe o destinatário global (cfg.to):
+ * multiusuário envia pro e-mail do dono; o cfg.to fica como fallback (dev/single-user).
+ */
+export async function sendEmail(cfg: MailerConfig, content: EmailContent, to?: string): Promise<void> {
   await cfg.transport({ from: cfg.from, to: to ?? cfg.to, subject: content.subject, text: content.text });
-}
-
-/** Envia o alerta de "char novo" (§7-A); `to` = e-mail do dono do filtro. */
-export async function sendNewAuctionAlert(
-  cfg: MailerConfig,
-  entry: AuctionListEntry,
-  to?: string,
-): Promise<void> {
-  await send(cfg, buildNewAuctionEmail(entry), to);
-}
-
-/** Envia o lembrete de fim de leilão (§7-B); `to` = e-mail de quem acompanha. */
-export async function sendReminderAlert(
-  cfg: MailerConfig,
-  target: ReminderTarget,
-  label: string,
-  to?: string,
-): Promise<void> {
-  await send(cfg, buildReminderEmail(target, label), to);
 }

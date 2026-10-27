@@ -25,14 +25,49 @@ model User {
   email     String
   name      String?
   picture   String?
+  /// Double opt-in (Fase 4): quando o usuário confirmou o e-mail. `null` = pendente → não
+  /// recebe alertas. Resetado pra null quando o e-mail da conta Google muda.
+  emailOptInAt DateTime? @map("email_opt_in_at") @db.Timestamptz
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
-  sessions        Session[]
-  watchFilters    WatchFilter[]
-  watchedAuctions WatchedAuction[]
+  sessions          Session[]
+  watchFilters      WatchFilter[]
+  watchedAuctions   WatchedAuction[]
+  emailVerifications EmailVerification[]
+  emailEvents       EmailEvent[]
 
   @@map("user")
+}
+
+/// Token de confirmação de e-mail (double opt-in, Fase 4). Mesmo padrão da Session: a PK é o
+/// SHA-256 (hex) do token cru; o link carrega o token cru. `email` amarra o token ao endereço
+/// que ele confirma (se o e-mail do Google mudar, um token antigo não vale pro novo).
+model EmailVerification {
+  id        String   @id
+  userId    String   @map("user_id") @db.Uuid
+  email     String
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verification")
+}
+
+/// Registro de e-mail enviado, para o rate-limit por usuário (Fase 4). `type`: `alert`
+/// (conta no teto) ou `limit` (aviso de teto atingido, deduplicado por janela).
+model EmailEvent {
+  id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id") @db.Uuid
+  type      String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("email_event")
 }
 
 /// Sessão de login. A PK é o SHA-256 (hex) do token de sessão; o cookie carrega o

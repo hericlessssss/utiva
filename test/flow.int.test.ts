@@ -41,12 +41,15 @@ describe('fluxo A ponta a ponta (integração)', () => {
       resolveDone = resolve;
     });
     await registerNewAuctionWorker(boss, {
-      from: 'bot@utiva',
-      to: 'fallback@x', // só fallback: o e-mail real sai pro dono do filtro
-      transport: (msg) => {
-        received.push(msg);
-        if (received.length === 3) resolveDone();
-        return Promise.resolve();
+      prisma,
+      mailer: {
+        from: 'bot@utiva',
+        to: 'fallback@x', // só fallback: o e-mail real sai pro dono do filtro
+        transport: (msg) => {
+          received.push(msg);
+          if (received.length === 3) resolveDone();
+          return Promise.resolve();
+        },
       },
     });
     const user = await makeUser(prisma, 'dono@utiva.test');

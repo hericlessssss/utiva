@@ -5,15 +5,18 @@ import { generateSessionToken, hashSessionToken, type GoogleIdentity } from '../
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
- * Insere ou atualiza o usuário a partir da identidade do Google. O `google_sub` é a
- * chave estável; e-mail/nome/foto são atualizados a cada login (podem mudar na conta Google).
+ * Insere ou atualiza o usuário a partir da identidade do Google. O `google_sub` é a chave
+ * estável; e-mail/nome/foto são atualizados a cada login (podem mudar na conta Google). Se o
+ * e-mail mudou, reseta o double opt-in (Fase 4): o novo endereço precisa confirmar de novo.
  */
-export function upsertUserByGoogle(prisma: PrismaClient, id: GoogleIdentity): Promise<User> {
+export async function upsertUserByGoogle(prisma: PrismaClient, id: GoogleIdentity): Promise<User> {
   const fields = { email: id.email, name: id.name ?? null, picture: id.picture ?? null };
+  const existing = await prisma.user.findUnique({ where: { googleSub: id.sub } });
+  const emailChanged = existing != null && existing.email !== id.email;
   return prisma.user.upsert({
     where: { googleSub: id.sub },
     create: { googleSub: id.sub, ...fields },
-    update: fields,
+    update: emailChanged ? { ...fields, emailOptInAt: null } : fields,
   });
 }
 

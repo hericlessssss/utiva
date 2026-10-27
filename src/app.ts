@@ -46,7 +46,12 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
 
     // Login e rotas de dados que exigem dono só existem com auth configurado (login obrigatório).
     if (deps.auth) {
-      app.register(authRoutes, { prisma: deps.prisma, auth: deps.auth, fetchImpl: deps.authFetch });
+      app.register(authRoutes, {
+        prisma: deps.prisma,
+        auth: deps.auth,
+        boss: deps.boss,
+        fetchImpl: deps.authFetch,
+      });
       const requireHook = requireUser(deps.prisma);
       app.register(filterRoutes, { prisma: deps.prisma, requireUser: requireHook });
       if (deps.boss) {
