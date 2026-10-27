@@ -33,6 +33,9 @@ COPY --from=build /app/dist ./dist
 COPY --from=web /app/web/dist ./web/dist
 COPY package.json ./
 COPY prisma ./prisma
+# openssl: o Prisma precisa dele em runtime (sem, loga warning e pode errar o query engine).
+RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
 # /data guarda o estado de runtime (cookie cf_clearance + cache de sprites) num volume.
 # Criado com dono `node` pra o volume nomeado herdar a permissão (o processo roda como node).
 RUN mkdir -p /data && chown node:node /data

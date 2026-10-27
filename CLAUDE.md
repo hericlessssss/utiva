@@ -36,7 +36,7 @@ Estas regras são inegociáveis neste repositório. Valem para toda tarefa de c�
 
 ## Estado atual
 
-**v1 + Fase 2 + `cf_clearance` + varredura de fim na `main`** (PRs #1–#4 mergeados). **Sprites do bazar (ADR 10) na branch `feat/sprites`** (TDD, DoD verde: backend 88 unit + 32 integração; frontend 52 testes; lint/typecheck/build nos dois; verificação visual do Detalhe + Lista em desktop e 360px). Inclui, na Lista, o outfit do char e os itens de exibição do card (fase 1).
+**NO AR em produção** (`https://2-24-100-80.sslip.io`). O projeto passou do v1 single-user local para **público/multiusuário** e está **deployado** (ver §14 do PLANEJAMENTO e a seção "## Deploy (produção)" abaixo). Fases concluídas: core (Fluxos A/B, detalhe, sprites, `cf_clearance`, varredura de fim) · **login Google (OIDC)** + **dados por usuário** · **double opt-in + rate-limit de e-mail (Fase 4)** · **frontend de login** · **deploy VPS Hostinger (Fase 6)**. DoD sempre verde (lint/typecheck/unit/int/build nos dois projetos + verificação visual). **O detalhe por fase e o que está pendente estão em `docs/PLANEJAMENTO.md` §14 — leia-o.** O resumo técnico do core segue abaixo.
 
 Implementado:
 - **Fluxo A** (alerta de char novo): cron → scrape fase 1 (`url`→`http-client`→`list-parser`) → detecção **por-filtro** via `auction_match` → fila pg-boss → e-mail via Resend.
@@ -53,6 +53,19 @@ Implementado:
 **Pendente:** validar o renovador de `cf_clearance` contra um challenge real (hoje o HTTP puro passa, então não há como exercitar o fallback ao vivo). Detecção de `cancelled` (exige raspar a página de detalhe/histórico — fora do escopo v1). Demais itens de validação/hardening em §13 (incl. truncamento de listas longas no detalhe).
 
 **`docs/PLANEJAMENTO.md` é a fonte da verdade** (documento vivo SDD). Leia-o antes de qualquer decisão de arquitetura, modelagem ou escopo — e **atualize-o** quando uma decisão mudar.
+
+## Deploy (produção — Fase 6)
+
+**No ar:** `https://2-24-100-80.sslip.io`. Runbook completo em **`docs/DEPLOY.md`** (leia antes de mexer em deploy).
+
+- **Onde roda:** VPS **Hostinger** (Ubuntu, `root@2.24.100.80`), que **já roda Kamal** e hospeda **outras apps do usuário** (acutia.com.br, niomed.net, preliator, trispect, ondetem…).
+- **⚠️ VPS COMPARTILHADA — regra de ouro:** o container **`kamal-proxy`** (compartilhado) é dono das portas **80/443** e faz o TLS de todas as apps. O Utiva **NUNCA** sobe proxy próprio nem binda 80/443. O `app` entra na rede externa **`kamal`** e o deploy **registra uma rota aditiva** no proxy (`docker exec kamal-proxy kamal-proxy deploy utiva --host $SITE_ADDRESS --target utiva-app-1:3000 --health-check-path /health --tls`). Nunca pare/altere serviços ou portas das outras apps.
+- **CI/CD:** push na `main` → **GitHub Actions** (`.github/workflows/deploy.yml`) builda a imagem no runner → `ghcr.io/hericlessssss/utiva` → SSH na VPS → `docker compose -f docker-compose.prod.yml up -d` → registra a rota no kamal-proxy. `paths-ignore` evita redeploy em mudança só de doc.
+- **Secrets:** no **GitHub Secrets** (o deploy regenera o `.env` da VPS). Não há `.env` de prod versionado; modelo em `.env.prod.example`. A chave SSH de deploy é dedicada (user `root`).
+- **Arquivos:** `docker-compose.prod.yml` (app GHCR + Postgres, sem porta pública), `infra/provision.sh` (provisiona a VPS: Docker+swap+/opt/utiva), `.github/workflows/deploy.yml`.
+- **Verificar/operar:** `curl -I https://2-24-100-80.sslip.io/health` · `docker exec kamal-proxy kamal-proxy list` · `docker compose -f docker-compose.prod.yml logs -f app`. Rollback: `IMAGE_TAG=<sha> docker compose ... up -d` + re-registrar a rota.
+- **GitHub CLI:** PRs no `hericlessssss/utiva` exigem `gh auth switch --user hericlessssss` (o default costuma estar na conta ezops → "must be a collaborator"). Merge: o GitHub bloqueia self-approval e o classificador do Claude Code bloqueia merge — o **usuário** mergeia via `! gh pr merge <n> --squash --admin`.
+- **Follow-ups:** domínio (Hostinger) libera e-mail do Resend pra terceiros (hoje sslip.io → `MAIL_FROM=onboarding@resend.dev`, só o próprio e-mail) + troca a URL; Chromium na imagem pro fallback de `cf_clearance`.
 
 ## Comandos
 

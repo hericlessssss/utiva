@@ -1,10 +1,13 @@
 name: deploy
 
-# Build da imagem no runner → push pro GHCR → deploy por SSH no VM GCP.
-# Dispara no push pra main e manualmente (workflow_dispatch).
+# Build da imagem no runner → push pro GHCR → deploy por SSH na VPS.
+# Dispara no push pra main e manualmente (workflow_dispatch). Mudança só de doc não redeploya.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
   workflow_dispatch:
 
 concurrency:
