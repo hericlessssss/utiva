@@ -1,0 +1,98 @@
+name: deploy
+
+# Build da imagem no runner → push pro GHCR → deploy por SSH no VM GCP.
+# Dispara no push pra main e manualmente (workflow_dispatch).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/hericlessssss/utiva
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push da imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Copia compose + Caddyfile pro VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: docker-compose.prod.yml,Caddyfile
+          target: /opt/utiva
+
+      - name: Deploy no VM
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+          GH_ACTOR: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SITE_ADDRESS: ${{ secrets.SITE_ADDRESS }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          MAIL_TO: ${{ secrets.MAIL_TO }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
+          OAUTH_REDIRECT_URI: ${{ secrets.OAUTH_REDIRECT_URI }}
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          envs: IMAGE_TAG,GH_ACTOR,REGISTRY_TOKEN,SITE_ADDRESS,POSTGRES_PASSWORD,RESEND_API_KEY,MAIL_FROM,MAIL_TO,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,COOKIE_SECRET,OAUTH_REDIRECT_URI
+          script: |
+            set -e
+            cd /opt/utiva
+
+            # .env gerado a partir dos GitHub Secrets (fonte única da verdade).
+            umask 077
+            cat > .env <<EOF
+            PORT=3000
+            HOST=0.0.0.0
+            SITE_ADDRESS=${SITE_ADDRESS}
+            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+            RESEND_API_KEY=${RESEND_API_KEY}
+            MAIL_FROM=${MAIL_FROM}
+            MAIL_TO=${MAIL_TO}
+            GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+            GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+            COOKIE_SECRET=${COOKIE_SECRET}
+            OAUTH_REDIRECT_URI=${OAUTH_REDIRECT_URI}
+            EOF
+
+            echo "${REGISTRY_TOKEN}" | docker login ghcr.io -u "${GH_ACTOR}" --password-stdin
+            export IMAGE_TAG="${IMAGE_TAG}"
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker logout ghcr.io
+            docker image prune -f

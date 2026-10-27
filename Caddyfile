@@ -1,0 +1,7 @@
+# Caddy — termina HTTPS (Let's Encrypt automático via HTTP-01 na :80) e faz
+# reverse proxy pro app na rede interna do compose. SITE_ADDRESS vem do .env
+# (ex.: 34-8-130-1.sslip.io). Trocar por um domínio depois = só mudar essa var.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}

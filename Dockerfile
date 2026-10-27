@@ -33,6 +33,9 @@ COPY --from=build /app/dist ./dist
 COPY --from=web /app/web/dist ./web/dist
 COPY package.json ./
 COPY prisma ./prisma
+# /data guarda o estado de runtime (cookie cf_clearance + cache de sprites) num volume.
+# Criado com dono `node` pra o volume nomeado herdar a permissão (o processo roda como node).
+RUN mkdir -p /data && chown node:node /data
 USER node
 EXPOSE 3000
 CMD ["node", "dist/main.js"]
