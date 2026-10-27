@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useApi } from '../api/context';
 import { AUCTION_DETAIL_URL, type AuctionDetail, type ItemEntry, type SpriteCategory } from '../api/types';
+import { Coin } from '../components/Coin';
 import { Sprite } from '../components/Sprite';
 import { Switch } from '../components/Switch';
 import { Timer } from '../components/Timer';
@@ -46,7 +47,7 @@ export function AuctionPage() {
   return (
     <article className="detail">
       <p className="crumbs">
-        <Link to="/">Leilões</Link>
+        <Link to="/leiloes">Leilões</Link>
       </p>
 
       <header className="detail-head">
@@ -107,16 +108,6 @@ export function AuctionPage() {
         <p className="empty">Detalhe ainda não carregado.</p>
       )}
     </article>
-  );
-}
-
-/** Moeda do bazar (Tibia Coins): glifo inline, sem depender de asset externo. */
-function Coin() {
-  return (
-    <svg className="coin" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-      <circle cx="8" cy="8" r="7" fill="#f4c542" stroke="#9a6b00" strokeWidth="1" />
-      <circle cx="8" cy="8" r="4.3" fill="none" stroke="#9a6b00" strokeWidth="1" opacity="0.7" />
-    </svg>
   );
 }
 
