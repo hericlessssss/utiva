@@ -1,0 +1,66 @@
+# Compose de produção (Fase 6). Diferente do docker-compose.yml (dev local):
+#  - `app` vem de uma imagem pronta no GHCR (buildada no CI), não de `build: .`;
+#  - `app` NÃO publica porta no host — quem fala com a internet é o Caddy (TLS);
+#  - `caddy` termina HTTPS (Let's Encrypt automático) e faz reverse proxy pro app.
+# O .env é escrito pelo deploy (GitHub Actions) a partir dos GitHub Secrets.
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp' # HTTP/3
+    environment:
+      # Domínio público servido (ex.: 34-8-130-1.sslip.io). Caddy emite o cert pra ele.
+      SITE_ADDRESS: ${SITE_ADDRESS}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # certificados — NÃO apagar (rate limit do Let's Encrypt)
+      - caddy_config:/config
+    depends_on:
+      - app
+
+  app:
+    image: ghcr.io/hericlessssss/utiva:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    # Aplica as migrations antes de subir (volume limpo não tem as tabelas).
+    command: sh -c "node_modules/.bin/prisma migrate deploy && node dist/main.js"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://utiva:${POSTGRES_PASSWORD}@db:5432/utiva
+      WEB_DIST: /app/web/dist
+      # Estado persistente do runtime (cookie cf_clearance + cache de sprites) fora da imagem.
+      CF_CLEARANCE_FILE: /data/.cf-clearance.json
+      SPRITE_CACHE_DIR: /data/sprite-cache
+    volumes:
+      - utiva_appdata:/data
+    # Sem `ports`: só a rede interna do compose; o Caddy alcança via `app:3000`.
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: utiva
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: utiva
+    volumes:
+      - utiva_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U utiva']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    # Sem `ports`: o Postgres só é acessível pelo app dentro da rede do compose.
+
+volumes:
+  utiva_pgdata:
+  utiva_appdata:
+  caddy_data:
+  caddy_config:
