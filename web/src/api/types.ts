@@ -1,3 +1,5 @@
+import { API_BASE } from './base';
+
 export interface WatchFilter {
   id: number;
   world: string | null;
@@ -33,6 +35,10 @@ export interface Auction {
   status: AuctionStatus;
   firstSeenAt: string;
   lastSeenAt: string;
+  /** Sprite do outfit exibido no card (stem do GIF); da fase 1 (ADR 10). */
+  outfit?: string | null;
+  /** Itens que o vendedor escolheu exibir no card; da fase 1. */
+  displayItems?: ItemEntry[] | null;
   /** Breakdown da fase 2 (skills/itens/…); ausente/null até o detalhe ser buscado. */
   attributes?: AuctionDetail | null;
   /** Ausente ou null quando nunca foi marcado. */
@@ -48,6 +54,15 @@ export interface SkillEntry {
 export interface ItemEntry {
   name: string;
   count: number;
+  /** Stem do GIF no proxy (ex.: `768`, `136_0`); `null` = sem imagem (cai no texto). */
+  sprite: string | null;
+}
+
+export type SpriteCategory = 'outfits' | 'mounts' | 'objects';
+
+/** URL do sprite no nosso proxy (ADR 10): `GET /sprites/:cat/:stem.gif`. */
+export function spriteUrl(category: SpriteCategory, sprite: string): string {
+  return `${API_BASE}/sprites/${category}/${sprite}.gif`;
 }
 
 export interface CharmEntry {
@@ -63,8 +78,8 @@ export interface AuctionDetail {
   items: ItemEntry[];
   imbuements: string[];
   charms: CharmEntry[];
-  mounts: string[];
-  outfits: string[];
+  mounts: ItemEntry[];
+  outfits: ItemEntry[];
 }
 
 export interface WatchResult {

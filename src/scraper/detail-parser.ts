@@ -12,6 +12,12 @@ export interface SkillEntry {
 export interface ItemEntry {
   name: string;
   count: number;
+  /**
+   * Stem do GIF em `static.tibia.com/images/charactertrade/{cat}/{sprite}.gif` (ex.: `768`,
+   * `136_0` p/ outfit com addons); `null` quando o ícone não tem `<img>`. O front monta a URL
+   * do proxy a partir disso (ADR 10). `count` é 1 p/ mounts/outfits (só itens empilham).
+   */
+  sprite: string | null;
 }
 
 export interface CharmEntry {
@@ -28,8 +34,8 @@ export interface AuctionDetail {
   items: ItemEntry[];
   imbuements: string[];
   charms: CharmEntry[];
-  mounts: string[];
-  outfits: string[];
+  mounts: ItemEntry[];
+  outfits: ItemEntry[];
 }
 
 /**
@@ -46,16 +52,30 @@ export class AuctionDetailParseError extends Error {
 }
 
 const COUNT_RE = /^(\d+)x\s+(.*)$/;
+// Stem do sprite na URL do tibia.com: .../charactertrade/<cat>/<stem>.gif (charactertrade é gif-only).
+const SPRITE_RE = /\/charactertrade\/\w+\/([\w-]+)\.gif/;
 
-/** Ícones de uma seção (itens/mounts/outfits): nome no `title`, com prefixo opcional "Nx". */
+/** Stem do sprite a partir do `src` de um `<img>` do bazar (ADR 10); `null` se não casar. */
+export function spriteStem(src: string | undefined | null): string | null {
+  return SPRITE_RE.exec(src ?? '')?.[1] ?? null;
+}
+
+/**
+ * Ícones de uma seção (itens/mounts/outfits): nome no `title` (com prefixo opcional "Nx") e o
+ * stem do sprite extraído do `<img src>` interno (ADR 10). Sem `<img>` reconhecível → `sprite`
+ * nulo (o front cai no texto).
+ */
 function parseIcons($: CheerioAPI, block: Selection): ItemEntry[] {
   return block
     .find('.CVIcon[title]')
     .toArray()
     .map((el) => {
       const title = ($(el).attr('title') ?? '').trim();
+      const sprite = spriteStem($(el).find('img').attr('src'));
       const m = COUNT_RE.exec(title);
-      return m ? { name: m[2]!.trim(), count: Number(m[1]) } : { name: title, count: 1 };
+      return m
+        ? { name: m[2]!.trim(), count: Number(m[1]), sprite }
+        : { name: title, count: 1, sprite };
     });
 }
 
@@ -137,7 +157,7 @@ export function parseAuctionDetail(html: string): AuctionDetail {
     items: parseIcons($, $('#ItemSummary')),
     imbuements: parseNameRows($, $('#Imbuements')),
     charms: parseCharms($, $('#Charms')),
-    mounts: parseIcons($, $('#Mounts')).map((m) => m.name),
-    outfits: parseIcons($, $('#Outfits')).map((o) => o.name),
+    mounts: parseIcons($, $('#Mounts')),
+    outfits: parseIcons($, $('#Outfits')),
   };
 }

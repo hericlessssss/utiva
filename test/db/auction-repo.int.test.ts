@@ -15,6 +15,8 @@ function entry(auctionId: number, over: Partial<AuctionListEntry> = {}): Auction
     world: 'Antica',
     endsAt: new Date('2026-10-26T18:00:00Z'),
     bid: { amount: 50, kind: 'current' },
+    outfit: null,
+    displayItems: [],
     ...over,
   };
 }

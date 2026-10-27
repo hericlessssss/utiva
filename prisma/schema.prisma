@@ -55,6 +55,10 @@ model Auction {
   pvpType     String?       @map("pvp_type")
   flags       Json?
   attributes  Json?
+  /// Sprite do outfit exibido no card da lista (stem do GIF, ex.: "1875_3"); vem da fase 1 (ADR 10).
+  outfit       String?      @map("outfit")
+  /// Itens que o vendedor escolheu exibir no card (array de {name,count,sprite}); vem da fase 1.
+  displayItems Json?        @map("display_items")
   status      AuctionStatus @default(active)
   firstSeenAt DateTime      @default(now()) @map("first_seen_at") @db.Timestamptz
   lastSeenAt  DateTime      @default(now()) @map("last_seen_at") @db.Timestamptz

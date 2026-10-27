@@ -6,13 +6,17 @@ import type PgBoss from 'pg-boss';
 import { auctionRoutes } from './routes/auctions.js';
 import { filterRoutes } from './routes/filters.js';
 import { healthRoutes } from './routes/health.js';
+import { spriteRoutes } from './routes/sprites.js';
 import { watchRoutes } from './routes/watch.js';
+import type { SpriteStore } from './sprites/sprite-store.js';
 
 export interface AppDeps {
   prisma?: PrismaClient;
   boss?: PgBoss;
   /** Pasta do build do frontend. Quando presente, a API serve o painel na mesma origem (ADR 9). */
   webDist?: string;
+  /** Proxy com cache dos sprites do bazar (ADR 10). Ausente = rota de sprites não registrada. */
+  spriteStore?: SpriteStore;
 }
 
 export function buildApp(deps: AppDeps = {}): FastifyInstance {
@@ -27,6 +31,9 @@ export function buildApp(deps: AppDeps = {}): FastifyInstance {
   }
   if (deps.prisma && deps.boss) {
     app.register(watchRoutes, { prisma: deps.prisma, boss: deps.boss });
+  }
+  if (deps.spriteStore) {
+    app.register(spriteRoutes, { store: deps.spriteStore });
   }
   if (deps.webDist) {
     // @fastify/static exige root absoluto; WEB_DIST costuma vir relativo ao cwd (web/dist).

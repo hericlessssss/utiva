@@ -20,11 +20,11 @@ describe('parseAuctionDetail', () => {
     expect(detail.skills).toContainEqual({ name: 'Axe Fighting', level: 11, percent: 96.66 });
   });
 
-  it('lista os itens com quantidade (prefixo "Nx")', () => {
+  it('lista os itens com quantidade (prefixo "Nx") e o sprite', () => {
     expect(detail.items).toHaveLength(76);
-    expect(detail.items[0]).toEqual({ name: 'document of the follower', count: 1 });
-    expect(detail.items).toContainEqual({ name: 'book', count: 2 });
-    expect(detail.items).toContainEqual({ name: 'backpack', count: 56 });
+    expect(detail.items[0]).toEqual({ name: 'document of the follower', count: 1, sprite: '768' });
+    expect(detail.items).toContainEqual({ name: 'book', count: 2, sprite: '2825' });
+    expect(detail.items.find((i) => i.name === 'backpack')?.count).toBe(56);
   });
 
   it('lista os imbuements por nome, na ordem da página', () => {
@@ -37,11 +37,11 @@ describe('parseAuctionDetail', () => {
     expect(detail.charms).toEqual([{ name: 'Wound', type: 'Major', grade: '1' }]);
   });
 
-  it('lista mounts e outfits por nome', () => {
-    expect(detail.mounts).toContain('War Bear');
+  it('lista mounts e outfits com nome e sprite', () => {
     expect(detail.mounts).toHaveLength(7);
-    expect(detail.outfits).toContain('Citizen (base)');
+    expect(detail.mounts).toContainEqual({ name: 'War Bear', count: 1, sprite: '370' });
     expect(detail.outfits).toHaveLength(30);
+    expect(detail.outfits).toContainEqual({ name: 'Citizen (base)', count: 1, sprite: '136_0' });
   });
 });
 

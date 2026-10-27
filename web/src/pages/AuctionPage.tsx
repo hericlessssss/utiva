@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { useApi } from '../api/context';
-import { AUCTION_DETAIL_URL, type AuctionDetail } from '../api/types';
+import { AUCTION_DETAIL_URL, type AuctionDetail, type ItemEntry, type SpriteCategory } from '../api/types';
+import { Sprite } from '../components/Sprite';
 import { Switch } from '../components/Switch';
 import { Timer } from '../components/Timer';
 import { formatDate, formatGold } from '../lib/auction-list';
@@ -77,9 +78,9 @@ export function AuctionPage() {
 
       <dl className="fields">
         <dt>Lance atual</dt>
-        <dd className="num">{formatGold(a.currentBid)}</dd>
+        <dd className="num bid"><Coin />{formatGold(a.currentBid)}</dd>
         <dt>Lance mínimo</dt>
-        <dd className="num">{formatGold(a.minBid)}</dd>
+        <dd className="num bid"><Coin />{formatGold(a.minBid)}</dd>
         <dt>Status</dt>
         <dd>{STATUS[a.status] ?? a.status}</dd>
         <dt>Sexo</dt>
@@ -109,7 +110,17 @@ export function AuctionPage() {
   );
 }
 
-/** Lista de nomes como chips (itens/imbuements/mounts/outfits), omitida se vazia. */
+/** Moeda do bazar (Tibia Coins): glifo inline, sem depender de asset externo. */
+function Coin() {
+  return (
+    <svg className="coin" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <circle cx="8" cy="8" r="7" fill="#f4c542" stroke="#9a6b00" strokeWidth="1" />
+      <circle cx="8" cy="8" r="4.3" fill="none" stroke="#9a6b00" strokeWidth="1" opacity="0.7" />
+    </svg>
+  );
+}
+
+/** Lista de nomes como chips (imbuements), omitida se vazia. */
 function ChipList({ label, names }: { label: string; names: string[] }) {
   if (names.length === 0) return null;
   return (
@@ -128,6 +139,32 @@ function ChipList({ label, names }: { label: string; names: string[] }) {
   );
 }
 
+/**
+ * Normaliza a lista de ícones. Leilões detalhados antes do ADR 10 guardaram mounts/outfits como
+ * `string[]` no jsonb; o backfill não re-busca quem já tem `attributes`, então coagimos aqui:
+ * string vira `{name, sprite:null}` (renderiza como texto), objeto passa direto.
+ */
+function asItems(raw: readonly (string | ItemEntry)[] | undefined | null): ItemEntry[] {
+  return (raw ?? []).map((x) => (typeof x === 'string' ? { name: x, count: 1, sprite: null } : x));
+}
+
+/** Grade de ícones (itens/mounts/outfits), omitida se vazia. */
+function IconGrid({ label, category, items }: { label: string; category: SpriteCategory; items: ItemEntry[] }) {
+  if (items.length === 0) return null;
+  return (
+    <section className="attr-section">
+      <h2 className="section-label">
+        {label} <span className="num">{items.length}</span>
+      </h2>
+      <div className="icon-grid">
+        {items.map((item, i) => (
+          <Sprite key={`${item.name}-${i}`} category={category} item={item} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 /** Breakdown da fase 2: skills, itens, imbuements, charms, mounts, outfits e stats gerais. */
 function AuctionAttributes({ detail }: { detail: AuctionDetail }) {
   const general = Object.entries(detail.general);
@@ -141,6 +178,9 @@ function AuctionAttributes({ detail }: { detail: AuctionDetail }) {
               <li key={s.name} className="skill-row">
                 <span className="skill-name">{s.name}</span>
                 <span className="num skill-level">{s.level}</span>
+                <span className="skill-bar">
+                  <span className="skill-bar-fill" style={{ width: `${s.percent}%` }} />
+                </span>
                 <span className="muted skill-pct">{s.percent}%</span>
               </li>
             ))}
@@ -168,9 +208,9 @@ function AuctionAttributes({ detail }: { detail: AuctionDetail }) {
       )}
 
       <ChipList label="Imbuements" names={detail.imbuements} />
-      <ChipList label="Itens" names={detail.items.map((i) => (i.count > 1 ? `${i.count}× ${i.name}` : i.name))} />
-      <ChipList label="Mounts" names={detail.mounts} />
-      <ChipList label="Outfits" names={detail.outfits} />
+      <IconGrid label="Itens" category="objects" items={asItems(detail.items)} />
+      <IconGrid label="Mounts" category="mounts" items={asItems(detail.mounts)} />
+      <IconGrid label="Outfits" category="outfits" items={asItems(detail.outfits)} />
 
       {general.length > 0 && (
         <section className="attr-section">

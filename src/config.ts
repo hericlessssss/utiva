@@ -11,6 +11,8 @@ export interface AppConfig {
   scrapeCron: string;
   /** Pasta do build do frontend (`web/dist`) a servir na mesma origem; ausente = só API. */
   webDist?: string;
+  /** Pasta de cache dos sprites do bazar (ADR 10); default `.sprite-cache`. */
+  spriteCacheDir: string;
 }
 
 type Env = Record<string, string | undefined>;
@@ -37,5 +39,6 @@ export function loadConfig(env: Env): AppConfig {
     cfClearanceFile: env.CF_CLEARANCE_FILE?.trim() || '.cf-clearance.json',
     scrapeCron: env.SCRAPE_CRON?.trim() || '*/5 * * * *',
     webDist: env.WEB_DIST?.trim() || undefined,
+    spriteCacheDir: env.SPRITE_CACHE_DIR?.trim() || '.sprite-cache',
   };
 }
