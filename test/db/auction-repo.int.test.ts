@@ -1,9 +1,11 @@
 import { PrismaClient } from '@prisma/client';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { finishEndedAuctions, hasMatch, recordMatch, upsertAuction } from '../../src/db/auction-repo.js';
 import type { AuctionListEntry } from '../../src/scraper/list-parser.js';
+import { makeUser } from '../helpers/auth.js';
 
 const prisma = new PrismaClient();
+let userId: string;
 
 function entry(auctionId: number, over: Partial<AuctionListEntry> = {}): AuctionListEntry {
   return {
@@ -22,6 +24,12 @@ function entry(auctionId: number, over: Partial<AuctionListEntry> = {}): Auction
 }
 
 describe('auction-repo (integração)', () => {
+  beforeAll(async () => {
+    await prisma.watchFilter.deleteMany();
+    await prisma.user.deleteMany();
+    userId = (await makeUser(prisma)).id;
+  });
+
   beforeEach(async () => {
     await prisma.auctionMatch.deleteMany();
     await prisma.auction.deleteMany();
@@ -32,6 +40,7 @@ describe('auction-repo (integração)', () => {
     await prisma.auctionMatch.deleteMany();
     await prisma.auction.deleteMany();
     await prisma.watchFilter.deleteMany();
+    await prisma.user.deleteMany();
     await prisma.$disconnect();
   });
 
@@ -73,7 +82,7 @@ describe('auction-repo (integração)', () => {
 
   it('hasMatch/recordMatch: marca idempotente e hasMatch reflete', async () => {
     await upsertAuction(prisma, entry(2292063));
-    const filter = await prisma.watchFilter.create({ data: {} });
+    const filter = await prisma.watchFilter.create({ data: { userId } });
 
     expect(await hasMatch(prisma, 2292063, filter.id)).toBe(false);
 

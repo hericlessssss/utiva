@@ -25,14 +25,15 @@ describe('scheduleReminders', () => {
     const end = new Date('2026-11-01T18:00:00Z');
     const now = new Date('2026-10-30T18:00:00Z'); // 2 dias antes → 5 thresholds (3d já passou)
 
-    const n = await scheduleReminders(boss, 2292063, end, now);
+    const n = await scheduleReminders(boss, 'user-1', 2292063, end, now);
 
     expect(n).toBe(5);
     expect(calls).toHaveLength(5);
     expect(calls[0]!.queue).toBe(REMINDER_QUEUE);
-    expect(calls[0]!.data).toMatchObject({ auctionId: 2292063 });
+    expect(calls[0]!.data).toMatchObject({ userId: 'user-1', auctionId: 2292063 });
     expect(calls[0]!.opts.startAfter).toBeInstanceOf(Date);
     expect(calls[0]!.opts.singletonKey).toContain('2292063');
+    expect(calls[0]!.opts.singletonKey).toContain('user-1');
   });
 
   it('não agenda nada se o leilão já acabou', async () => {
@@ -40,6 +41,7 @@ describe('scheduleReminders', () => {
 
     const n = await scheduleReminders(
       boss,
+      'user-1',
       1,
       new Date('2026-11-01T18:00:00Z'),
       new Date('2026-11-02T00:00:00Z'),

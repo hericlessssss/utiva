@@ -1,4 +1,4 @@
-import type { PrismaClient, WatchFilter } from '@prisma/client';
+import type { PrismaClient, User, WatchFilter } from '@prisma/client';
 import { auctionsNeedingDetail, saveAuctionDetail } from '../db/auction-repo.js';
 import type { FetchPageFn } from './cf-clearance.js';
 import { detectNewAuctions, type OnNewAuction } from './detect.js';
@@ -37,32 +37,46 @@ export function watchFilterToListFilter(f: WatchFilterParams): ListFilter {
   };
 }
 
+/** Filtro ativo com o dono embutido — o fluxo A precisa do e-mail pra alertar quem o criou. */
+export type WatchFilterWithUser = WatchFilter & { user: User };
+
+/** Callback por char novo que também recebe o filtro (e, nele, o dono) que o capturou. */
+export type OnNewForFilter = (
+  entry: AuctionListEntry,
+  filter: WatchFilterWithUser,
+) => Promise<void>;
+
 /**
  * Um ciclo de scraping para um preset (§5/§7-A): monta a URL, busca a página 1,
  * detecta os leilões novos, registra os matches do filtro e devolve os novos
- * (para o worker enfileirar o e-mail de "char novo").
+ * (para o worker enfileirar o e-mail de "char novo" pro dono do filtro).
  */
 export async function runFilterTick(
   prisma: PrismaClient,
-  filter: WatchFilter,
+  filter: WatchFilterWithUser,
   opts: FetchPageOptions = {},
-  onNew?: OnNewAuction,
+  onNew?: OnNewForFilter,
   fetchPageFn: FetchPageFn = fetchPage,
 ): Promise<AuctionListEntry[]> {
   const html = await fetchPageFn(buildListUrl(watchFilterToListFilter(filter)), opts);
-  return detectNewAuctions(prisma, html, filter.id, onNew);
+  // detect trabalha por entrada; aqui "fechamos" o filtro no callback pra o chamador saber o dono.
+  const onNewEntry: OnNewAuction | undefined = onNew
+    ? (entry) => onNew(entry, filter)
+    : undefined;
+  return detectNewAuctions(prisma, html, filter.id, onNewEntry);
 }
 
 /** Roda um tick para cada watch_filter ativo, em sequência (baixa concorrência, §5). */
 export async function runActiveFilters(
   prisma: PrismaClient,
   opts: FetchPageOptions = {},
-  onNew?: OnNewAuction,
+  onNew?: OnNewForFilter,
   fetchPageFn: FetchPageFn = fetchPage,
 ): Promise<Map<number, AuctionListEntry[]>> {
   const filters = await prisma.watchFilter.findMany({
     where: { active: true },
     orderBy: { id: 'asc' },
+    include: { user: true },
   });
 
   const byFilter = new Map<number, AuctionListEntry[]>();

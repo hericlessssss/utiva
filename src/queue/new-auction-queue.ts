@@ -4,6 +4,12 @@ import type { AuctionListEntry } from '../scraper/list-parser.js';
 
 export const NEW_AUCTION_QUEUE = 'new-auction-email';
 
+/** Destinatário do alerta: dono do filtro que capturou o leilão (fluxo por usuário). */
+export interface AlertRecipient {
+  userId: string;
+  to: string;
+}
+
 /** Forma serializável do leilão no job (Date vira ISO string no JSON do pg-boss). */
 export interface NewAuctionJob {
   auctionId: number;
@@ -14,18 +20,44 @@ export interface NewAuctionJob {
   world: string;
   endsAt: string;
   bid: { amount: number; kind: 'current' | 'minimum' };
+  /** Dono do filtro (pra quem vai o e-mail) e seu endereço, resolvidos no enqueue. */
+  userId: string;
+  to: string;
 }
 
-export function toJob(entry: AuctionListEntry): NewAuctionJob {
+export function toJob(entry: AuctionListEntry, recipient: AlertRecipient): NewAuctionJob {
   // Só os campos que o e-mail usa: outfit/itens de exibição (ADR 10) ficam de fora do job.
   const { auctionId, characterName, level, vocation, sex, world, bid } = entry;
-  return { auctionId, characterName, level, vocation, sex, world, bid, endsAt: entry.endsAt.toISOString() };
+  return {
+    auctionId,
+    characterName,
+    level,
+    vocation,
+    sex,
+    world,
+    bid,
+    endsAt: entry.endsAt.toISOString(),
+    userId: recipient.userId,
+    to: recipient.to,
+  };
 }
 
 export function fromJob(job: NewAuctionJob): AuctionListEntry {
   // O job não carrega outfit/itens de exibição (toJob não os serializa); reconstituímos vazios
-  // só pra satisfazer o tipo do entry consumido pelo mailer.
-  return { ...job, endsAt: new Date(job.endsAt), outfit: null, displayItems: [] };
+  // só pra satisfazer o tipo do entry consumido pelo mailer. userId/to não fazem parte do entry.
+  const { auctionId, characterName, level, vocation, sex, world, bid } = job;
+  return {
+    auctionId,
+    characterName,
+    level,
+    vocation,
+    sex,
+    world,
+    bid,
+    endsAt: new Date(job.endsAt),
+    outfit: null,
+    displayItems: [],
+  };
 }
 
 /** Cria as filas usadas pela app (pg-boss v10 exige a fila existir antes de send/work). */
@@ -34,8 +66,12 @@ export async function ensureQueues(boss: PgBoss): Promise<void> {
 }
 
 /** Enfileira o alerta de um char novo (§7-A), com retries e backoff em falha transitória. */
-export async function enqueueNewAuction(boss: PgBoss, entry: AuctionListEntry): Promise<void> {
-  await boss.send(NEW_AUCTION_QUEUE, toJob(entry), {
+export async function enqueueNewAuction(
+  boss: PgBoss,
+  entry: AuctionListEntry,
+  recipient: AlertRecipient,
+): Promise<void> {
+  await boss.send(NEW_AUCTION_QUEUE, toJob(entry, recipient), {
     retryLimit: 5,
     retryDelay: 60,
     retryBackoff: true,
@@ -51,7 +87,7 @@ export async function enqueueNewAuction(boss: PgBoss, entry: AuctionListEntry): 
 export async function registerNewAuctionWorker(boss: PgBoss, mailer: MailerConfig): Promise<void> {
   await boss.work<NewAuctionJob>(NEW_AUCTION_QUEUE, async (jobs) => {
     for (const job of jobs) {
-      await sendNewAuctionAlert(mailer, fromJob(job.data));
+      await sendNewAuctionAlert(mailer, fromJob(job.data), job.data.to);
     }
   });
 }

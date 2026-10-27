@@ -17,9 +17,42 @@ enum AuctionStatus {
   cancelled
 }
 
+/// Conta de usuário autenticada via Google (OIDC) — Fase 2 (multiusuário).
+/// Identidade estável é o `google_sub` (o `email` pode mudar na conta Google).
+model User {
+  id        String    @id @default(uuid()) @db.Uuid
+  googleSub String    @unique @map("google_sub")
+  email     String
+  name      String?
+  picture   String?
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  sessions        Session[]
+  watchFilters    WatchFilter[]
+  watchedAuctions WatchedAuction[]
+
+  @@map("user")
+}
+
+/// Sessão de login. A PK é o SHA-256 (hex) do token de sessão; o cookie carrega o
+/// token cru. Assim um vazamento de leitura do banco não revela cookies utilizáveis.
+model Session {
+  id        String   @id
+  userId    String   @map("user_id") @db.Uuid
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
 /// Preset de busca do usuário — mapeia 1:1 os filtros do Char Bazaar (§5).
 model WatchFilter {
   id        Int      @id @default(autoincrement())
+  userId    String   @map("user_id") @db.Uuid
   world     String?
   pvpType   String?  @map("pvp_type")
   battleye  String?
@@ -34,8 +67,10 @@ model WatchFilter {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   matches AuctionMatch[]
 
+  @@index([userId])
   @@map("watch_filter")
 }
 
@@ -64,21 +99,26 @@ model Auction {
   lastSeenAt  DateTime      @default(now()) @map("last_seen_at") @db.Timestamptz
 
   matches AuctionMatch[]
-  watched WatchedAuction?
+  watched WatchedAuction[]
 
   @@index([status, endAt])
   @@map("auction")
 }
 
-/// Leilão que o usuário marcou para acompanhar (toggle) — dispara os lembretes de fim (§7-B).
+/// Leilão que um usuário marcou para acompanhar (toggle) — dispara os lembretes de fim (§7-B).
+/// PK composta (user_id, auction_id): vários usuários podem acompanhar o mesmo leilão.
 model WatchedAuction {
-  auctionId Int      @id @map("auction_id")
+  userId    String   @map("user_id") @db.Uuid
+  auctionId Int      @map("auction_id")
   enabled   Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   auction Auction @relation(fields: [auctionId], references: [auctionId], onDelete: Cascade)
 
+  @@id([userId, auctionId])
+  @@index([auctionId])
   @@map("watched_auction")
 }
 

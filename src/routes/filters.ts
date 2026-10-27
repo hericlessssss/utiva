@@ -1,5 +1,5 @@
-import { Prisma, type PrismaClient } from '@prisma/client';
-import type { FastifyInstance } from 'fastify';
+import { type PrismaClient } from '@prisma/client';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 export interface FilterBody {
   world?: string | null;
@@ -36,10 +36,6 @@ const filterBodySchema = {
   },
 } as const;
 
-function isNotFound(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025';
-}
-
 /** Valida ranges (só quando ambos os limites vêm no payload) — evita preset impossível. */
 function rangeError(body: FilterBody): string | null {
   if (body.levelFrom != null && body.levelTo != null && body.levelFrom > body.levelTo) {
@@ -51,14 +47,20 @@ function rangeError(body: FilterBody): string | null {
   return null;
 }
 
-/** CRUD dos presets de busca (watch_filter). v1 single-user, sem auth. */
+type PreHandler = (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+
+/** CRUD dos presets de busca (watch_filter), escopado ao usuário logado (requireUser → 401). */
 export async function filterRoutes(
   app: FastifyInstance,
-  opts: { prisma: PrismaClient },
+  opts: { prisma: PrismaClient; requireUser: PreHandler },
 ): Promise<void> {
-  const { prisma } = opts;
+  const { prisma, requireUser } = opts;
+  // Todo acesso a /filters exige login; o hook injeta req.user (garantido não-nulo adiante).
+  app.addHook('preHandler', requireUser);
 
-  app.get('/filters', () => prisma.watchFilter.findMany({ orderBy: { id: 'asc' } }));
+  app.get('/filters', (req) =>
+    prisma.watchFilter.findMany({ where: { userId: req.user!.id }, orderBy: { id: 'asc' } }),
+  );
 
   app.post<{ Body: FilterBody }>(
     '/filters',
@@ -66,7 +68,9 @@ export async function filterRoutes(
     async (req, reply) => {
       const err = rangeError(req.body);
       if (err) return reply.code(400).send({ error: err });
-      const created = await prisma.watchFilter.create({ data: req.body });
+      const created = await prisma.watchFilter.create({
+        data: { ...req.body, userId: req.user!.id },
+      });
       return reply.code(201).send(created);
     },
   );
@@ -78,7 +82,8 @@ export async function filterRoutes(
       const id = Number(req.params.id);
       if (!Number.isInteger(id)) return reply.code(400).send({ error: 'id inválido' });
 
-      const existing = await prisma.watchFilter.findUnique({ where: { id } });
+      // Só enxerga/edita filtro do próprio usuário (ownership) — filtro de outro dá 404.
+      const existing = await prisma.watchFilter.findFirst({ where: { id, userId: req.user!.id } });
       if (!existing) return reply.code(404).send({ error: 'filtro não encontrado' });
 
       // Valida o estado MESCLADO (um update parcial não pode deixar o range impossível).
@@ -92,12 +97,9 @@ export async function filterRoutes(
   app.delete<{ Params: { id: string } }>('/filters/:id', async (req, reply) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return reply.code(400).send({ error: 'id inválido' });
-    try {
-      await prisma.watchFilter.delete({ where: { id } });
-      return reply.code(204).send();
-    } catch (err) {
-      if (isNotFound(err)) return reply.code(404).send({ error: 'filtro não encontrado' });
-      throw err;
-    }
+    // deleteMany com o userId no where: remove só se for do dono; count 0 = inexistente/alheio.
+    const { count } = await prisma.watchFilter.deleteMany({ where: { id, userId: req.user!.id } });
+    if (count === 0) return reply.code(404).send({ error: 'filtro não encontrado' });
+    return reply.code(204).send();
   });
 }
