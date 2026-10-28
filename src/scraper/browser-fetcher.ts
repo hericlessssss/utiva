@@ -24,7 +24,11 @@ export interface BrowserFetcherOptions {
   headless?: boolean;
   /** Timeout por navegação (default 45s — o challenge pode levar alguns segundos). */
   timeoutMs?: number;
+  /** Quanto esperar o managed challenge auto-resolver antes de ler o HTML (default 25s). */
+  challengeTimeoutMs?: number;
 }
+
+const CHALLENGE_TITLE = /just a moment|checking|attention required/i;
 
 /** Evasões anti-automação que o Cloudflare inspeciona antes de liberar a página. */
 function stealthInit(): void {
@@ -37,6 +41,7 @@ function stealthInit(): void {
 export function createBrowserFetcher(opts: BrowserFetcherOptions = {}): BrowserFetcher {
   const headless = opts.headless ?? false;
   const timeoutMs = opts.timeoutMs ?? 45_000;
+  const challengeTimeoutMs = opts.challengeTimeoutMs ?? 25_000;
 
   let browser: Browser | null = null;
   let context: BrowserContext | null = null;
@@ -69,7 +74,26 @@ export function createBrowserFetcher(opts: BrowserFetcherOptions = {}): BrowserF
     const page = await ctx.newPage();
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+
+      // O managed challenge ("Just a moment") do Cloudflare carrega primeiro e só depois (alguns
+      // segundos, via JS) redireciona pro conteúdo real. Ler o HTML logo pegava a PÁGINA DO
+      // CHALLENGE (0 leilões, sem erro). Espera o título deixar de ser o do challenge.
+      const deadline = Date.now() + challengeTimeoutMs;
+      let title = await page.title();
+      while (CHALLENGE_TITLE.test(title) && Date.now() < deadline) {
+        await page.waitForTimeout(1000);
+        title = await page.title();
+      }
+      // folga pro conteúdo real assentar após o redirect do challenge.
+      await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+
       ua ??= await page.evaluate(() => navigator.userAgent);
+      title = await page.title();
+      if (CHALLENGE_TITLE.test(title)) {
+        // Challenge não limpou no tempo: o HTML abaixo vira 0 leilões. Logar explicita o motivo
+        // (vs. silêncio) — se persistir na VPS, é sinal de IP de datacenter barrado → proxy.
+        console.warn(`[browser-fetch] challenge do Cloudflare não limpou para ${url} (title=${JSON.stringify(title)})`);
+      }
       return await page.content();
     } finally {
       await page.close();
