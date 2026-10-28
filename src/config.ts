@@ -23,6 +23,8 @@ export interface AppConfig {
   /** Arquivo onde o cookie cf_clearance renovado é persistido entre restarts (§5). */
   cfClearanceFile: string;
   scrapeCron: string;
+  /** Proxy de saída do scraper (ex.: túnel pro proxy residencial). Ausente = egress direto. */
+  scrapeProxy?: string;
   /** Pasta do build do frontend (`web/dist`) a servir na mesma origem; ausente = só API. */
   webDist?: string;
   /** Pasta de cache dos sprites do bazar (ADR 10); default `.sprite-cache`. */
@@ -74,6 +76,7 @@ export function loadConfig(env: Env): AppConfig {
     cfClearance: env.CF_CLEARANCE?.trim() || undefined,
     cfClearanceFile: env.CF_CLEARANCE_FILE?.trim() || '.cf-clearance.json',
     scrapeCron: env.SCRAPE_CRON?.trim() || '*/5 * * * *',
+    scrapeProxy: env.SCRAPE_PROXY?.trim() || undefined,
     webDist: env.WEB_DIST?.trim() || undefined,
     spriteCacheDir: env.SPRITE_CACHE_DIR?.trim() || '.sprite-cache',
     auth: loadAuthConfig(env),

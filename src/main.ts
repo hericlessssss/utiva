@@ -48,7 +48,7 @@ async function main(): Promise<void> {
   // barrar o HTTP puro ("Just a moment") e nem emite mais um cf_clearance reutilizável, então a
   // lista/detalhe são lidos num Chromium de verdade (sob Xvfb no container). O `browser.fetchPage`
   // é injetado no scraper; o UA real alimenta o proxy de sprites.
-  const browser = createBrowserFetcher();
+  const browser = createBrowserFetcher({ proxyServer: cfg.scrapeProxy });
 
   // Proxy com cache dos sprites do bazar (ADR 10): baixa do static.tibia.com com o UA do browser.
   const spriteStore = createSpriteStore({

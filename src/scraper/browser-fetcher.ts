@@ -26,6 +26,9 @@ export interface BrowserFetcherOptions {
   timeoutMs?: number;
   /** Quanto esperar o managed challenge auto-resolver antes de ler o HTML (default 25s). */
   challengeTimeoutMs?: number;
+  /** Proxy de saída (ex.: `http://172.17.0.1:8899` → túnel pro IP residencial). O IP de
+   * datacenter da VPS leva "Attention Required!" do Cloudflare; por um IP residencial, passa. */
+  proxyServer?: string;
 }
 
 const CHALLENGE_TITLE = /just a moment|checking|attention required/i;
@@ -55,6 +58,7 @@ export function createBrowserFetcher(opts: BrowserFetcherOptions = {}): BrowserF
       // `--no-sandbox`: o processo roda como `node` dentro do container, sem o sandbox do Chromium.
       browser = await chromium.launch({
         headless,
+        proxy: opts.proxyServer ? { server: opts.proxyServer } : undefined,
         args: [
           '--disable-blink-features=AutomationControlled',
           '--no-sandbox',
