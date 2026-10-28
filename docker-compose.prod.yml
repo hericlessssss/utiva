@@ -28,6 +28,10 @@ services:
       # Estado persistente do runtime (cookie cf_clearance + cache de sprites) fora da imagem.
       CF_CLEARANCE_FILE: /data/.cf-clearance.json
       SPRITE_CACHE_DIR: /data/sprite-cache
+      # Proxy de saída do scraper: túnel reverso SSH (no host, bind 172.17.0.1:8899 = docker0,
+      # alcançável do container) pro proxy residencial no PC do dono. Sem o túnel vivo, o fetch
+      # falha e é logado — a raspagem só roda quando o PC/proxy está de pé. Override via .env.
+      SCRAPE_PROXY: ${SCRAPE_PROXY:-http://172.17.0.1:8899}
     volumes:
       - utiva_appdata:/data
     networks:
